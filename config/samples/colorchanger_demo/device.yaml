@@ -1,0 +1,23 @@
+apiVersion: device.openyurt.io/v1alpha1
+kind: Device
+metadata:
+  name: testapp 
+spec:
+  description: Test application 
+  adminState: unlocked
+  operatingState: enabled
+  protocols:
+    example:
+      host: localhost 
+      port: "0"
+      unitID: "1"
+  labels:
+  - color 
+  - testapp 
+  location: tokyo
+  service: dummy-rest-device-service 
+  profile: color-changer  
+  deviceProperties:
+    color:
+      name: color
+      desiredValue: green

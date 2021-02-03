@@ -1,0 +1,279 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: deviceprofiles.device.openyurt.io
+spec:
+  group: device.openyurt.io
+  names:
+    kind: DeviceProfile
+    listKind: DeviceProfileList
+    plural: deviceprofiles
+    singular: deviceprofile
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DeviceProfile represents the attributes and operational capabilities
+          of a device. It is a template for which there can be multiple matching devices
+          within a given system. NOTE This struct is derived from edgex/go-mod-core-contracts/models/deviceprofile.go
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DeviceProfileSpec defines the desired state of DeviceProfile
+            properties:
+              coreCommands:
+                items:
+                  properties:
+                    get:
+                      description: Get Command
+                      properties:
+                        path:
+                          description: Path used by service for action on a device
+                            or sensor
+                          type: string
+                        responses:
+                          description: Responses from get or put requests to service
+                          items:
+                            description: Response for a Get or Put request to a service
+                            properties:
+                              code:
+                                type: string
+                              description:
+                                type: string
+                              expectedValues:
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                        url:
+                          description: Url for requests from command service
+                          type: string
+                      type: object
+                    id:
+                      description: Id is a unique identifier, such as a UUID
+                      type: string
+                    name:
+                      description: Command name (unique on the profile)
+                      type: string
+                    put:
+                      description: Put Command
+                      properties:
+                        parameterNames:
+                          items:
+                            type: string
+                          type: array
+                        path:
+                          description: Path used by service for action on a device
+                            or sensor
+                          type: string
+                        responses:
+                          description: Responses from get or put requests to service
+                          items:
+                            description: Response for a Get or Put request to a service
+                            properties:
+                              code:
+                                type: string
+                              description:
+                                type: string
+                              expectedValues:
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                        url:
+                          description: Url for requests from command service
+                          type: string
+                      type: object
+                  type: object
+                type: array
+              description:
+                type: string
+              deviceCommands:
+                description: TODO support the following field
+                items:
+                  properties:
+                    get:
+                      items:
+                        properties:
+                          deviceCommand:
+                            description: The replacement of Resource field
+                            type: string
+                          deviceResource:
+                            description: The replacement of Object field
+                            type: string
+                          index:
+                            type: string
+                          mappings:
+                            additionalProperties:
+                              type: string
+                            type: object
+                          object:
+                            description: Deprecated
+                            type: string
+                          operation:
+                            type: string
+                          parameter:
+                            type: string
+                          resource:
+                            description: Deprecated
+                            type: string
+                          secondary:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      type: array
+                    name:
+                      type: string
+                    set:
+                      items:
+                        properties:
+                          deviceCommand:
+                            description: The replacement of Resource field
+                            type: string
+                          deviceResource:
+                            description: The replacement of Object field
+                            type: string
+                          index:
+                            type: string
+                          mappings:
+                            additionalProperties:
+                              type: string
+                            type: object
+                          object:
+                            description: Deprecated
+                            type: string
+                          operation:
+                            type: string
+                          parameter:
+                            type: string
+                          resource:
+                            description: Deprecated
+                            type: string
+                          secondary:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      type: array
+                  type: object
+                type: array
+              deviceResources:
+                items:
+                  properties:
+                    attributes:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    description:
+                      type: string
+                    name:
+                      type: string
+                    properties:
+                      properties:
+                        units:
+                          properties:
+                            defaultValue:
+                              type: string
+                            readWrite:
+                              type: string
+                            type:
+                              type: string
+                          type: object
+                        value:
+                          properties:
+                            assertion:
+                              description: Required value of the property, set for
+                                checking error state. Failing an assertion condition
+                                wil  l mark the device with an error state
+                              type: string
+                            base:
+                              type: string
+                            defaultValue:
+                              type: string
+                            floatEncoding:
+                              type: string
+                            mask:
+                              type: string
+                            maximum:
+                              type: string
+                            mediaType:
+                              type: string
+                            minimum:
+                              type: string
+                            offset:
+                              type: string
+                            precision:
+                              type: string
+                            readWrite:
+                              type: string
+                            scale:
+                              type: string
+                            shift:
+                              type: string
+                            size:
+                              type: string
+                            type:
+                              type: string
+                          type: object
+                      required:
+                      - value
+                      type: object
+                    tag:
+                      type: string
+                  required:
+                  - description
+                  - name
+                  - properties
+                  type: object
+                type: array
+              id:
+                type: string
+              labels:
+                description: Labels used to search for groups of profiles
+                items:
+                  type: string
+                type: array
+              manufacturer:
+                description: Manufacturer of the device
+                type: string
+              model:
+                description: Model of the device
+                type: string
+            type: object
+          status:
+            description: DeviceProfileStatus defines the observed state of DeviceProfile
+            properties:
+              addedToEdgeX:
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

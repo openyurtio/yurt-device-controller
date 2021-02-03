@@ -1,0 +1,21 @@
+domain: openyurt.io
+layout: go.kubebuilder.io/v3
+projectName: device-controller
+repo: github.com/charleszheng44/device-controller
+resources:
+- api:
+    crdVersion: v1
+  group: device
+  kind: ValueDescriptor
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  group: device
+  kind: DeviceProfile
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  group: device
+  kind: Device
+  version: v1alpha1
+version: 3-alpha

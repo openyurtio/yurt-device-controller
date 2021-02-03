@@ -1,0 +1,122 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: deviceservices.device.openyurt.io
+spec:
+  group: device.openyurt.io
+  names:
+    kind: DeviceService
+    listKind: DeviceServiceList
+    plural: deviceservices
+    singular: deviceservice
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DeviceService is the Schema for the deviceservices API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DeviceServiceSpec defines the desired state of DeviceService
+            properties:
+              addressable:
+                description: address (MQTT topic, HTTP address, serial bus, etc.)
+                  for reaching the service
+                properties:
+                  address:
+                    description: Address of the addressable
+                    type: string
+                  id:
+                    description: ID is a unique identifier for the Addressable, such
+                      as a UUID
+                    type: string
+                  method:
+                    description: Method for connecting (i.e. POST)
+                    type: string
+                  name:
+                    description: Name is a unique name given to the Addressable
+                    type: string
+                  password:
+                    description: Password of the user for authentication for the addressable
+                    type: string
+                  path:
+                    description: Path for callbacks
+                    type: string
+                  port:
+                    description: Port for the address
+                    type: integer
+                  protocol:
+                    description: Protocol for the address (HTTP/TCP)
+                    type: string
+                  publisher:
+                    description: For message bus protocols
+                    type: string
+                  topic:
+                    description: Topic for message bus addressables
+                    type: string
+                  user:
+                    description: User id for authentication
+                    type: string
+                type: object
+              adminState:
+                description: Device Service Admin State
+                type: string
+              description:
+                type: string
+              id:
+                description: the Id assigned by the EdgeX foundry TODO store this
+                  field in the status
+                type: string
+              labels:
+                description: tags or other labels applied to the device service for
+                  search or other identification needs on the EdgeX Foundry
+                items:
+                  type: string
+                type: array
+              lastConnected:
+                description: TODO store this field in the status
+                format: int64
+                type: integer
+              lastReported:
+                description: time in milliseconds that the device last reported data
+                  to the core TODO store this field in the status
+                format: int64
+                type: integer
+              operatingState:
+                description: operational state - either enabled or disabled
+                type: string
+            type: object
+          status:
+            description: DeviceServiceStatus defines the observed state of DeviceService
+            properties:
+              addedToEdgeX:
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -1,0 +1,20 @@
+apiVersion: device.openyurt.io/v1alpha1
+kind: Device
+metadata:
+  name: temp-and-humidity-sensor-cluster-01
+spec:
+  description: Raspberry Pi sensor cluster
+  adminState: unlocked
+  operatingState: enabled
+  protocols:
+    example:
+      host: dummy
+      port: "1234"
+      unitID: "1"
+  labels:
+  - Humidity sensor
+  - Temperature sensor
+  - DHT11
+  location: Tokyo
+  service: edgex-device-rest
+  profile: sensor-cluster

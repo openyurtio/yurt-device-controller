@@ -1,0 +1,24 @@
+# permissions for end users to edit deviceprofiles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: deviceprofile-editor-role
+rules:
+- apiGroups:
+  - device.openyurt.io
+  resources:
+  - deviceprofiles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - device.openyurt.io
+  resources:
+  - deviceprofiles/status
+  verbs:
+  - get

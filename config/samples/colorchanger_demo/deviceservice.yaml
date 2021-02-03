@@ -1,0 +1,17 @@
+apiVersion: device.openyurt.io/v1alpha1
+kind: DeviceService
+metadata:
+  name: dummy-rest-device-service
+spec:
+  description: "Gateway for emergency venting system"
+  labels:
+  - color
+  - testapp
+  adminState: unlocked
+  operatingState: enabled
+  addressable: 
+    name: testapp 
+    protocol: HTTP
+    address: 172.17.0.16
+    port: 5000
+    path: "/api/v1/device/register"

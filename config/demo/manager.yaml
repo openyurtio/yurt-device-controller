@@ -1,0 +1,671 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: deviceprofiles.device.openyurt.io
+spec:
+  group: device.openyurt.io
+  names:
+    kind: DeviceProfile
+    listKind: DeviceProfileList
+    plural: deviceprofiles
+    singular: deviceprofile
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DeviceProfile represents the attributes and operational capabilities of a device. It is a template for which there can be multiple matching devices within a given system. NOTE This struct is derived from edgex/go-mod-core-contracts/models/deviceprofile.go
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DeviceProfileSpec defines the desired state of DeviceProfile
+            properties:
+              coreCommands:
+                items:
+                  properties:
+                    get:
+                      description: Get Command
+                      properties:
+                        path:
+                          description: Path used by service for action on a device or sensor
+                          type: string
+                        responses:
+                          description: Responses from get or put requests to service
+                          items:
+                            description: Response for a Get or Put request to a service
+                            properties:
+                              code:
+                                type: string
+                              description:
+                                type: string
+                              expectedValues:
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                        url:
+                          description: Url for requests from command service
+                          type: string
+                      type: object
+                    id:
+                      description: Id is a unique identifier, such as a UUID
+                      type: string
+                    name:
+                      description: Command name (unique on the profile)
+                      type: string
+                    put:
+                      description: Put Command
+                      properties:
+                        parameterNames:
+                          items:
+                            type: string
+                          type: array
+                        path:
+                          description: Path used by service for action on a device or sensor
+                          type: string
+                        responses:
+                          description: Responses from get or put requests to service
+                          items:
+                            description: Response for a Get or Put request to a service
+                            properties:
+                              code:
+                                type: string
+                              description:
+                                type: string
+                              expectedValues:
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                        url:
+                          description: Url for requests from command service
+                          type: string
+                      type: object
+                  type: object
+                type: array
+              description:
+                type: string
+              deviceCommands:
+                description: TODO support the following field
+                items:
+                  properties:
+                    get:
+                      items:
+                        properties:
+                          deviceCommand:
+                            description: The replacement of Resource field
+                            type: string
+                          deviceResource:
+                            description: The replacement of Object field
+                            type: string
+                          index:
+                            type: string
+                          mappings:
+                            additionalProperties:
+                              type: string
+                            type: object
+                          object:
+                            description: Deprecated
+                            type: string
+                          operation:
+                            type: string
+                          parameter:
+                            type: string
+                          resource:
+                            description: Deprecated
+                            type: string
+                          secondary:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      type: array
+                    name:
+                      type: string
+                    set:
+                      items:
+                        properties:
+                          deviceCommand:
+                            description: The replacement of Resource field
+                            type: string
+                          deviceResource:
+                            description: The replacement of Object field
+                            type: string
+                          index:
+                            type: string
+                          mappings:
+                            additionalProperties:
+                              type: string
+                            type: object
+                          object:
+                            description: Deprecated
+                            type: string
+                          operation:
+                            type: string
+                          parameter:
+                            type: string
+                          resource:
+                            description: Deprecated
+                            type: string
+                          secondary:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      type: array
+                  type: object
+                type: array
+              deviceResources:
+                items:
+                  properties:
+                    attributes:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    description:
+                      type: string
+                    name:
+                      type: string
+                    properties:
+                      properties:
+                        units:
+                          properties:
+                            defaultValue:
+                              type: string
+                            readWrite:
+                              type: string
+                            type:
+                              type: string
+                          type: object
+                        value:
+                          properties:
+                            assertion:
+                              description: Required value of the property, set for checking error state. Failing an assertion condition wil  l mark the device with an error state
+                              type: string
+                            base:
+                              type: string
+                            defaultValue:
+                              type: string
+                            floatEncoding:
+                              type: string
+                            mask:
+                              type: string
+                            maximum:
+                              type: string
+                            mediaType:
+                              type: string
+                            minimum:
+                              type: string
+                            offset:
+                              type: string
+                            precision:
+                              type: string
+                            readWrite:
+                              type: string
+                            scale:
+                              type: string
+                            shift:
+                              type: string
+                            size:
+                              type: string
+                            type:
+                              type: string
+                          type: object
+                      required:
+                      - value
+                      type: object
+                    tag:
+                      type: string
+                  required:
+                  - description
+                  - name
+                  - properties
+                  type: object
+                type: array
+              id:
+                type: string
+              labels:
+                description: Labels used to search for groups of profiles
+                items:
+                  type: string
+                type: array
+              manufacturer:
+                description: Manufacturer of the device
+                type: string
+              model:
+                description: Model of the device
+                type: string
+            type: object
+          status:
+            description: DeviceProfileStatus defines the observed state of DeviceProfile
+            properties:
+              addedToEdgeX:
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: devices.device.openyurt.io
+spec:
+  group: device.openyurt.io
+  names:
+    kind: Device
+    listKind: DeviceList
+    plural: devices
+    singular: device
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Device is the Schema for the devices API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DeviceSpec defines the desired state of Device
+            properties:
+              adminState:
+                description: Admin state (locked/unlocked)
+                type: string
+              description:
+                type: string
+              deviceProperties:
+                additionalProperties:
+                  properties:
+                    desiredValue:
+                      type: string
+                    name:
+                      type: string
+                    putURL:
+                      type: string
+                  required:
+                  - desiredValue
+                  - name
+                  type: object
+                description: TODO support the following field A list of auto-generated events coming from the device AutoEvents     []AutoEvent                   `json:"autoEvents"`
+                type: object
+              labels:
+                description: Other labels applied to the device to help with searching
+                items:
+                  type: string
+                type: array
+              location:
+                description: Device service specific location (interface{} is an empty interface so it can be anything)
+                type: string
+              operatingState:
+                description: Operating state (enabled/disabled)
+                type: string
+              profile:
+                description: Associated Device Profile - Describes the device
+                type: string
+              protocols:
+                additionalProperties:
+                  additionalProperties:
+                    type: string
+                  type: object
+                description: A map of supported protocols for the given device
+                type: object
+              service:
+                description: Associated Device Service - One per device
+                type: string
+            required:
+            - profile
+            - service
+            type: object
+          status:
+            description: DeviceStatus defines the observed state of Device
+            properties:
+              addedToEdgeX:
+                description: AddedToEdgeX indicates whether the object has been successfully created on EdgeX Foundry
+                type: boolean
+              deviceProperties:
+                additionalProperties:
+                  properties:
+                    actualValue:
+                      type: string
+                    getURL:
+                      type: string
+                    name:
+                      type: string
+                  required:
+                  - actualValue
+                  - name
+                  type: object
+                type: object
+              id:
+                type: string
+              lastConnected:
+                description: Time (milliseconds) that the device last provided any feedback or responded to any request
+                format: int64
+                type: integer
+              lastReported:
+                description: Time (milliseconds) that the device reported data to the core microservice
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: deviceservices.device.openyurt.io
+spec:
+  group: device.openyurt.io
+  names:
+    kind: DeviceService
+    listKind: DeviceServiceList
+    plural: deviceservices
+    singular: deviceservice
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DeviceService is the Schema for the deviceservices API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DeviceServiceSpec defines the desired state of DeviceService
+            properties:
+              addressable:
+                description: address (MQTT topic, HTTP address, serial bus, etc.) for reaching the service
+                properties:
+                  address:
+                    description: Address of the addressable
+                    type: string
+                  id:
+                    description: ID is a unique identifier for the Addressable, such as a UUID
+                    type: string
+                  method:
+                    description: Method for connecting (i.e. POST)
+                    type: string
+                  name:
+                    description: Name is a unique name given to the Addressable
+                    type: string
+                  password:
+                    description: Password of the user for authentication for the addressable
+                    type: string
+                  path:
+                    description: Path for callbacks
+                    type: string
+                  port:
+                    description: Port for the address
+                    type: integer
+                  protocol:
+                    description: Protocol for the address (HTTP/TCP)
+                    type: string
+                  publisher:
+                    description: For message bus protocols
+                    type: string
+                  topic:
+                    description: Topic for message bus addressables
+                    type: string
+                  user:
+                    description: User id for authentication
+                    type: string
+                type: object
+              adminState:
+                description: Device Service Admin State
+                type: string
+              description:
+                type: string
+              id:
+                description: the Id assigned by the EdgeX foundry TODO store this field in the status
+                type: string
+              labels:
+                description: tags or other labels applied to the device service for search or other identification needs on the EdgeX Foundry
+                items:
+                  type: string
+                type: array
+              lastConnected:
+                description: TODO store this field in the status
+                format: int64
+                type: integer
+              lastReported:
+                description: time in milliseconds that the device last reported data to the core TODO store this field in the status
+                format: int64
+                type: integer
+              operatingState:
+                description: operational state - either enabled or disabled
+                type: string
+            type: object
+          status:
+            description: DeviceServiceStatus defines the observed state of DeviceService
+            properties:
+              addedToEdgeX:
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: valuedescriptors.device.openyurt.io
+spec:
+  group: device.openyurt.io
+  names:
+    kind: ValueDescriptor
+    listKind: ValueDescriptorList
+    plural: valuedescriptors
+    singular: valuedescriptor
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ValueDescriptor is the Schema for the valuedescriptors API NOTE Thie struct is derived from edgex/go-mod-core-contracts/models/value-descriptor.go
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ValueDescriptorSpec defines the desired state of ValueDescriptor
+            properties:
+              created:
+                format: int64
+                type: integer
+              defaultValue:
+                type: string
+              description:
+                type: string
+              floatEncoding:
+                type: string
+              formatting:
+                type: string
+              id:
+                type: string
+              labels:
+                items:
+                  type: string
+                type: array
+              max:
+                type: string
+              mediaType:
+                type: string
+              min:
+                type: string
+              modified:
+                format: int64
+                type: integer
+              origin:
+                format: int64
+                type: integer
+              type:
+                type: string
+              uomLabel:
+                type: string
+            type: object
+          status:
+            description: ValueDescriptorStatus defines the observed state of ValueDescriptor
+            properties:
+              addedToEdgeX:
+                description: AddedToEdgeX indicates whether the object has been successfully created on EdgeX Foundry
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+# apiVersion: v1
+# data:
+#   controller_manager_config.yaml: |
+#     apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+#     kind: ControllerManagerConfig
+#     health:
+#       healthProbeBindAddress: :8081
+#     metrics:
+#       bindAddress: 127.0.0.1:8080
+#     webhook:
+#       port: 9443
+#     leaderElection:
+#       leaderElect: true
+#       resourceName: b3ad6d22.openyurt.io
+# kind: ConfigMap
+# metadata:
+#   name: device-controller-manager-config
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   labels:
+#     control-plane: controller-manager
+#   name: device-controller-controller-manager-metrics-service
+# spec:
+#   ports:
+#   - name: https
+#     port: 8443
+#     targetPort: https
+#   selector:
+#     control-plane: controller-manager
+# ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: device-controller-controller-manager
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect=false
+        command:
+        - /usr/local/bin/manager
+        image: chaozheng/devicecontroller:dp23
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsUser: 65532
+      terminationGracePeriodSeconds: 10

@@ -1,0 +1,20 @@
+# permissions for end users to view deviceprofiles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: deviceprofile-viewer-role
+rules:
+- apiGroups:
+  - device.openyurt.io
+  resources:
+  - deviceprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - device.openyurt.io
+  resources:
+  - deviceprofiles/status
+  verbs:
+  - get
