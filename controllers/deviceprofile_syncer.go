@@ -1,44 +1,68 @@
+/*
+Copyright 2021 The OpenYurt Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package controllers
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 
-	coremetacli "github.com/charleszheng44/device-controller/clients/core-metadata"
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	"github.com/go-logr/logr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	devv1 "github.com/charleszheng44/device-controller/api/v1alpha1"
+	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
+	devcli "github.com/openyurtio/device-controller/clients"
+	edgexclis "github.com/openyurtio/device-controller/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/controllers/util"
 )
 
 type DeviceProfileSyncer struct {
 	// syncing period in seconds
 	syncPeriod time.Duration
 	// EdgeX core-data-service's client
-	*coremetacli.CoreMetaClient
+	edgeClient devcli.DeviceProfileInterface
 	// Kubernetes client
 	client.Client
-	log logr.Logger
+	log      logr.Logger
+	NodePool string
 }
 
 // NewDeviceProfileSyncer initialize a New DeviceProfileSyncer
 func NewDeviceProfileSyncer(client client.Client,
 	logr logr.Logger,
-	periodSecs uint32) DeviceProfileSyncer {
+	periodSecs uint32,
+	cfg *rest.Config) (DeviceProfileSyncer, error) {
 	log := logr.WithName("syncer").WithName("DeviceProfile")
+	nodePool, err := util.GetNodePool(cfg)
+	if err != nil {
+		return DeviceProfileSyncer{}, err
+	}
 	return DeviceProfileSyncer{
 		syncPeriod: time.Duration(periodSecs) * time.Second,
-		CoreMetaClient: coremetacli.NewCoreMetaClient(
-			"edgex-core-metadata.default", 48081, log),
-		Client: client,
-		log:    log,
-	}
+		edgeClient: edgexclis.NewEdgexDeviceProfile("edgex-core-metadata.default", 48081, log),
+		Client:     client,
+		log:        log,
+		NodePool:   nodePool,
+	}, nil
 }
 
 // NewDeviceProfileSyncerRunnablel initialize a controller-runtime manager runnable
@@ -55,26 +79,37 @@ func (ds *DeviceProfileSyncer) Run(stop <-chan struct{}) {
 		for {
 			<-time.After(ds.syncPeriod)
 			// list devices on edgex foundry
-			eDevs, err := ds.ListDeviceProfile()
+			eDevs, err := ds.edgeClient.List(context.Background(), devcli.ListOptions{})
 			if err != nil {
 				ds.log.Error(err, "fail to list the deviceprofile object on the EdgeX Foundry")
 				continue
 			}
+			addNodePoolField(eDevs, ds.NodePool)
 			// list devices on Kubernetes
-			var kDevs devv1.DeviceProfileList
+			var kDevs devicev1alpha1.DeviceProfileList
 			if err := ds.List(context.TODO(), &kDevs); err != nil {
 				ds.log.Error(err, "fail to list the deviceprofile object on the Kubernetes")
 				continue
 			}
-			// create the devices on Kubernetes but not on EdgeX
-			newKDevs := findNewDeviceProfile(eDevs, kDevs.Items)
+			// create the device profiles on Kubernetes but not on EdgeX
+			newKDevs, updateKDevs := findNewUpdateDeviceProfile(eDevs, kDevs.Items)
 			if len(newKDevs) != 0 {
-				if err := createDeviceProfile(ds.log, ds.Client, newKDevs); err != nil {
-					ds.log.Error(err, "fail to create devices profile")
+				if err := createDeviceProfile(ds.log, ds.Client, newKDevs, ds.NodePool); err != nil {
+					ds.log.Error(err, "fail to create device profiles")
 					continue
 				}
 			}
-			ds.log.V(5).Info("new deviceprofile not found")
+			// update the device profiles according EdgeX
+			if len(updateKDevs) != 0 {
+				// TODO
+			}
+			// delete the device profiles on Kubernetes but not on Egdex
+			deleteKDevs := findDeleteDeviceProfile(eDevs, kDevs.Items)
+			if len(deleteKDevs) != 0 {
+				if err := deleteDeviceProfile(ds.log, ds.Client, deleteKDevs); err != nil {
+					ds.log.Error(err, "fail to delete device profiles")
+				}
+			}
 		}
 	}()
 
@@ -82,173 +117,89 @@ func (ds *DeviceProfileSyncer) Run(stop <-chan struct{}) {
 	ds.log.Info("stopping the deviceprofile syncer")
 }
 
-// findNewDeviceProfile finds deviceprofiles that have been created on the EdgeX but
-// not the Kubernetes
-func findNewDeviceProfile(
-	edgeXDevs []models.DeviceProfile,
-	kubeDevs []devv1.DeviceProfile) []models.DeviceProfile {
-	var retDevs []models.DeviceProfile
+func addNodePoolField(edgeXDevs []devicev1alpha1.DeviceProfile, NodePoolName string) {
+	for i, _ := range edgeXDevs {
+		edgeXDevs[i].Spec.NodePool = NodePoolName
+	}
+}
+
+// findNewUpdateDeviceProfile finds deviceprofiles that have been created on the EdgeX but not the Kubernetes
+func findNewUpdateDeviceProfile(edgeXDevs, kubeDevs []devicev1alpha1.DeviceProfile) ([]devicev1alpha1.DeviceProfile, []devicev1alpha1.DeviceProfile) {
+	var addDevs, updateDevs []devicev1alpha1.DeviceProfile
 	for _, exd := range edgeXDevs {
 		var exist bool
 		for _, kd := range kubeDevs {
-			if strings.ToLower(exd.Name) == kd.Name {
+			if strings.ToLower(exd.Name) == util.GetEdgeNameTrimNodePool(kd.Name, kd.Spec.NodePool) {
 				exist = true
+				if !reflect.DeepEqual(exd.Spec, kd.Spec) {
+					kd.Spec = exd.Spec
+					updateDevs = append(updateDevs, kd)
+				}
 				break
 			}
 		}
 		if !exist {
-			retDevs = append(retDevs, exd)
+			addDevs = append(addDevs, exd)
 		}
 	}
 
-	return retDevs
+	return addDevs, updateDevs
 }
 
-// createDeviceProfile creates the list of devices
-func createDeviceProfile(log logr.Logger, cli client.Client, edgeXDevs []models.DeviceProfile) error {
+// findDeleteDeviceProfile finds deviceprofiles that exist on the Kubernetes but not on the EdgeX
+func findDeleteDeviceProfile(edgeXDevs, kubeDevs []devicev1alpha1.DeviceProfile) []devicev1alpha1.DeviceProfile {
+	var deleteDevs []devicev1alpha1.DeviceProfile
+	for _, kd := range kubeDevs {
+		var exist bool
+		for _, exd := range edgeXDevs {
+			if strings.ToLower(exd.Name) == util.GetEdgeNameTrimNodePool(kd.Name, kd.Spec.NodePool) {
+				exist = true
+				break
+			}
+		}
+		if !exist && kd.Status.Synced {
+			deleteDevs = append(deleteDevs, kd)
+		}
+	}
+	return deleteDevs
+}
+
+func getKubeNameWithPrefix(edgeName, NodePoolName string) string {
+	if NodePoolName == "" {
+		return edgeName
+	}
+	return fmt.Sprintf("%s-%s", NodePoolName, edgeName)
+}
+
+// createDeviceProfile creates the list of device profiles
+func createDeviceProfile(log logr.Logger, cli client.Client, edgeXDevs []devicev1alpha1.DeviceProfile, NodePoolName string) error {
 	for _, ed := range edgeXDevs {
-		kd := toKubeDeviceProfile(ed)
-		if err := cli.Create(context.TODO(), &kd); err != nil {
+		ed.SetName(getKubeNameWithPrefix(ed.GetName(), NodePoolName))
+		if err := cli.Create(context.TODO(), &ed); err != nil {
 			if apierrors.IsAlreadyExists(err) {
-				log.Info("DeviceProfile already exist on Kubernetes",
-					"deviceprofile", strings.ToLower(ed.Name))
+				log.Info("DeviceProfile already exist on Kubernetes", "deviceprofile", strings.ToLower(ed.Name))
 				continue
 			}
-			log.Error(err, "fail to create the DeviceProfile on Kubernetes",
-				"deviceprofile", ed.Name)
 			return err
 		}
+		if err := cli.Status().Update(context.TODO(), &ed); err != nil {
+			return err
+		}
+		log.Info("Successfully create DeviceProfile to Kubernetes", "DeviceProfile", ed.GetName())
 	}
 	return nil
 }
 
-func toKubeDeviceProfile(dp models.DeviceProfile) devv1.DeviceProfile {
-	return devv1.DeviceProfile{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      strings.ToLower(dp.Name),
-			Namespace: "default",
-			Labels: map[string]string{
-				EdgeXObjectName: dp.Name,
-			},
-		},
-		Spec: devv1.DeviceProfileSpec{
-			Description:     dp.Description,
-			Id:              dp.Id,
-			Manufacturer:    dp.Manufacturer,
-			Model:           dp.Model,
-			Labels:          dp.Labels,
-			DeviceResources: toKubeDeviceResources(dp.DeviceResources),
-			CoreCommands:    toKubeCoreCommands(dp.CoreCommands),
-		},
-		Status: devv1.DeviceProfileStatus{
-			AddedToEdgeX: true,
-		},
+func deleteDeviceProfile(log logr.Logger, cli client.Client, kubeDevs []devicev1alpha1.DeviceProfile) error {
+	for _, kd := range kubeDevs {
+		if err := cli.Delete(context.TODO(), &kd); err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Info("DeviceProfile doesn't exist on Kubernetes", "deviceprofile", kd.Name)
+				continue
+			}
+			return err
+		}
+		log.Info("Successfully delete DeviceProfile on Kubernetes", "DeviceProfile", kd.GetName())
 	}
-}
-
-func toKubeDeviceResources(drs []models.DeviceResource) []devv1.DeviceResource {
-	var ret []devv1.DeviceResource
-	for _, dr := range drs {
-		ret = append(ret, toKubeDeviceResource(dr))
-	}
-	return ret
-}
-
-func toKubeDeviceResource(dr models.DeviceResource) devv1.DeviceResource {
-	return devv1.DeviceResource{
-		Description: dr.Description,
-		Name:        dr.Name,
-		Tag:         dr.Tag,
-		Properties:  toKubeProfileProperty(dr.Properties),
-		Attributes:  dr.Attributes,
-	}
-}
-
-func toKubeProfileProperty(pp models.ProfileProperty) devv1.ProfileProperty {
-	return devv1.ProfileProperty{
-		Value: toKubePropertyValue(pp.Value),
-		Units: toKubeUnits(pp.Units),
-	}
-}
-
-func toKubePropertyValue(pv models.PropertyValue) devv1.PropertyValue {
-	return devv1.PropertyValue{
-		Type:          pv.Type,
-		ReadWrite:     pv.ReadWrite,
-		Minimum:       pv.Minimum,
-		Maximum:       pv.Maximum,
-		DefaultValue:  pv.DefaultValue,
-		Size:          pv.Size,
-		Mask:          pv.Mask,
-		Shift:         pv.Shift,
-		Scale:         pv.Scale,
-		Offset:        pv.Offset,
-		Base:          pv.Base,
-		Assertion:     pv.Assertion,
-		Precision:     pv.Precision,
-		FloatEncoding: pv.FloatEncoding,
-		MediaType:     pv.MediaType,
-	}
-}
-
-func toKubeUnits(u models.Units) devv1.Units {
-	return devv1.Units{
-		Type:         u.Type,
-		ReadWrite:    u.ReadWrite,
-		DefaultValue: u.DefaultValue,
-	}
-}
-
-func toKubeCoreCommands(ccs []models.Command) []devv1.Command {
-	var ret []devv1.Command
-	for _, cc := range ccs {
-		ret = append(ret, toKubeCoreCommand(cc))
-	}
-	return ret
-}
-
-func toKubeCoreCommand(cc models.Command) devv1.Command {
-	return devv1.Command{
-		Name: cc.Name,
-		Id:   cc.Id,
-		Get:  toKubeGet(cc.Get),
-		Put:  toKubePut(cc.Put),
-	}
-}
-
-func toKubeGet(get models.Get) devv1.Get {
-	return devv1.Get{
-		Action: toKubeAction(get.Action),
-	}
-}
-
-func toKubePut(put models.Put) devv1.Put {
-	return devv1.Put{
-		Action:         toKubeAction(put.Action),
-		ParameterNames: put.ParameterNames,
-	}
-}
-
-func toKubeAction(act models.Action) devv1.Action {
-	return devv1.Action{
-		Path:      act.Path,
-		Responses: toKubeResponses(act.Responses),
-		URL:       act.URL,
-	}
-}
-
-func toKubeResponses(reps []models.Response) []devv1.Response {
-	var ret []devv1.Response
-	for _, rep := range reps {
-		ret = append(ret, toKubeResponse(rep))
-	}
-	return ret
-}
-
-func toKubeResponse(rep models.Response) devv1.Response {
-	return devv1.Response{
-		Code:           rep.Code,
-		Description:    rep.Description,
-		ExpectedValues: rep.ExpectedValues,
-	}
+	return nil
 }

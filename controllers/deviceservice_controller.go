@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes authors.
+Copyright 2021 The OpenYurt Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	devicev1alpha1 "github.com/charleszheng44/device-controller/api/v1alpha1"
-	clis "github.com/charleszheng44/device-controller/clients"
-	coremetacli "github.com/charleszheng44/device-controller/clients/core-metadata"
+	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
+	clis "github.com/openyurtio/device-controller/clients"
+	coremetacli "github.com/openyurtio/device-controller/clients/core-metadata"
 )
 
 // DeviceServiceReconciler reconciles a DeviceService object

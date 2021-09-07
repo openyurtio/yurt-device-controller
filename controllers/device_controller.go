@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes authors.
+Copyright 2021 The OpenYurt Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,10 +30,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	devicev1alpha1 "github.com/charleszheng44/device-controller/api/v1alpha1"
-	clis "github.com/charleszheng44/device-controller/clients"
-	corecmdcli "github.com/charleszheng44/device-controller/clients/core-command"
-	coremetacli "github.com/charleszheng44/device-controller/clients/core-metadata"
+	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
+	clis "github.com/openyurtio/device-controller/clients"
+	corecmdcli "github.com/openyurtio/device-controller/clients/core-command"
+	coremetacli "github.com/openyurtio/device-controller/clients/core-metadata"
+	edgexclis "github.com/openyurtio/device-controller/clients/edgex-foundry"
 )
 
 // DeviceReconciler reconciles a Device object
@@ -254,8 +255,8 @@ func toEdgeXDevice(d devicev1alpha1.Device) models.Device {
 		Labels:         d.Spec.Labels,
 		Location:       d.Spec.Location,
 		Service:        models.DeviceService{Name: d.Spec.Service},
-		Profile: toEdgeXDeviceProfile(
-			devicev1alpha1.DeviceProfile{
+		Profile: *edgexclis.ToEdgeXDeviceProfile(
+			&devicev1alpha1.DeviceProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: d.Spec.Profile,
 				},

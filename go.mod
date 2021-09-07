@@ -1,4 +1,4 @@
-module github.com/charleszheng44/device-controller
+module github.com/openyurtio/device-controller
 
 go 1.15
 

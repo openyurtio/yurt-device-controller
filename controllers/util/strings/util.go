@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The OpenYurt Authors.
+Copyright 2020 The OpenYurt Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clients
+package strings
 
-// import "errors"
-import "strings"
-
-type NotFoundError struct{}
-
-func (e *NotFoundError) Error() string { return "Item not found" }
-
-func IsNotFoundErr(err error) bool {
-	return err.Error() == "Item not found" || strings.HasPrefix(err.Error(), "no item found")
-	// return errors.Is(err, &NotFoundError{})
+// IsInStringLst checks if 'str' is in the 'strLst'
+func IsInStringLst(strLst []string, str string) bool {
+	if len(strLst) == 0 {
+		return false
+	}
+	for _, s := range strLst {
+		if str == s {
+			return true
+		}
+	}
+	return false
 }

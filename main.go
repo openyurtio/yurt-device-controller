@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes authors.
+Copyright 2021 The OpenYurt Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	devicev1alpha1 "github.com/charleszheng44/device-controller/api/v1alpha1"
-	"github.com/charleszheng44/device-controller/controllers"
+	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
+	"github.com/openyurtio/device-controller/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -96,7 +96,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "DeviceProfile")
 		os.Exit(1)
 	}
-	dfs := controllers.NewDeviceProfileSyncer(mgr.GetClient(), mgr.GetLogger(), EdgeXSyncPeriodSecs)
+	dfs, err := controllers.NewDeviceProfileSyncer(mgr.GetClient(), mgr.GetLogger(), EdgeXSyncPeriodSecs, mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create syncer", "syncer", "DeviceProfile")
+		os.Exit(1)
+	}
 	mgr.Add(dfs.NewDeviceProfileSyncerRunnable())
 	setupLog.Info("add device profile syncer")
 
