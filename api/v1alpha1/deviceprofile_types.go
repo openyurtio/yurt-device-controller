@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes authors.
+Copyright 2021 The OpenYurt Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,8 +60,8 @@ type Units struct {
 }
 
 type Command struct {
-	// EdgeXId is a unique identifier used by EdgeX Foundry, such as a UUID
-	EdgeXId string `json:"id,omitempty"`
+	// EdgeId is a unique identifier used by EdgeX Foundry, such as a UUID
+	EdgeId string `json:"id,omitempty"`
 	// Command name (unique on the profile)
 	Name string `json:"name,omitempty"`
 	// Get Command
@@ -119,13 +119,15 @@ type ResourceOperation struct {
 
 // DeviceProfileSpec defines the desired state of DeviceProfile
 type DeviceProfileSpec struct {
+	// NodePool specifies which nodePool the deviceProfile belongs to
+	NodePool    string `json:"nodePool,omitempty"`
 	Description string `json:"description,omitempty"`
 	// Manufacturer of the device
 	Manufacturer string `json:"manufacturer,omitempty"`
 	// Model of the device
 	Model string `json:"model,omitempty"`
-	// EdgeXLabels used to search for groups of profiles on EdgeX Foundry
-	EdgeXLabels     []string         `json:"labels,omitempty"`
+	// Labels used to search for groups of profiles on EdgeX Foundry
+	Labels          []string         `json:"labels,omitempty"`
 	DeviceResources []DeviceResource `json:"deviceResources,omitempty"`
 
 	// TODO support the following field
@@ -135,8 +137,8 @@ type DeviceProfileSpec struct {
 
 // DeviceProfileStatus defines the observed state of DeviceProfile
 type DeviceProfileStatus struct {
-	EdgeXId      string `json:"id,omitempty"`
-	AddedToEdgeX bool   `json:"addedToEdgeX,omitempty"`
+	EdgeId string `json:"id,omitempty"`
+	Synced bool   `json:"Synced,omitempty"`
 }
 
 //+kubebuilder:object:root=true

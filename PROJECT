@@ -1,7 +1,7 @@
 domain: openyurt.io
 layout: go.kubebuilder.io/v3
 projectName: device-controller
-repo: github.com/charleszheng44/device-controller
+repo: github.com/openyurtio/device-controller
 resources:
 - api:
     crdVersion: v1
