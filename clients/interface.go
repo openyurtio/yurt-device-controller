@@ -1,0 +1,104 @@
+/*
+Copyright 2021 The OpenYurt Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package clients
+
+import (
+	"context"
+	"github.com/openyurtio/device-controller/api/v1alpha1"
+)
+
+// CreateOptions defines additional options when creating an object
+// Additional general field definitions can be added
+type CreateOptions struct{}
+
+// DeleteOptions defines additional options when deleting an object
+// Additional general field definitions can be added
+type DeleteOptions struct{}
+
+// UpdateOptions defines additional options when updating an object
+// Additional general field definitions can be added
+type UpdateOptions struct{}
+
+// GetOptions defines additional options when getting an object
+// Additional general field definitions can be added
+type GetOptions struct{}
+
+// ListOptions defines additional options when listing an object
+type ListOptions struct {
+	// A selector to restrict the list of returned objects by their labels.
+	// Defaults to everything.
+	// +optional
+	LabelSelector map[string]string
+	// A selector to restrict the list of returned objects by their fields.
+	// Defaults to everything.
+	// +optional
+	FieldSelector map[string]string
+}
+
+// DeviceInterface defines the interfaces which used to create, delete, update, get and list Device objects on edge-side platform
+type DeviceInterface interface {
+	DevicePropertyInterface
+	Create(ctx context.Context, device *v1alpha1.Device, options CreateOptions) (*v1alpha1.Device, error)
+	Delete(ctx context.Context, name string, options DeleteOptions) error
+	Update(ctx context.Context, device *v1alpha1.Device, options UpdateOptions) (*v1alpha1.Device, error)
+	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.Device, error)
+	List(ctx context.Context, options ListOptions) ([]v1alpha1.Device, error)
+}
+
+// DevicePropertyInterface defines the interfaces which used to get, list and set the actual status value of the device properties
+type DevicePropertyInterface interface {
+	GetPropertyState(ctx context.Context, propertyName string, device *v1alpha1.Device, options GetOptions) (*v1alpha1.ActualPropertyState, error)
+	UpdatePropertyState(ctx context.Context, propertyName string, device *v1alpha1.Device, options UpdateOptions) error
+	ListPropertiesState(ctx context.Context, device *v1alpha1.Device, options ListOptions) (map[string]v1alpha1.DesiredPropertyState, map[string]v1alpha1.ActualPropertyState, error)
+}
+
+// DeviceServiceInterface defines the interfaces which used to create, delete, update, get and list DeviceService objects on edge-side platform
+type DeviceServiceInterface interface {
+	AddressableInterface
+	Create(ctx context.Context, deviceService *v1alpha1.DeviceService, options CreateOptions) (*v1alpha1.DeviceService, error)
+	Delete(ctx context.Context, name string, options DeleteOptions) error
+	Update(ctx context.Context, deviceService *v1alpha1.DeviceService, options UpdateOptions) (*v1alpha1.DeviceService, error)
+	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.DeviceService, error)
+	List(ctx context.Context, options ListOptions) ([]v1alpha1.DeviceService, error)
+}
+
+// AddressableInterface defines the interfaces which used to create, delete, update, get and list Addressable objects on edge-side platform
+type AddressableInterface interface {
+	CreateAddressable(ctx context.Context, addressable *v1alpha1.Addressable, options CreateOptions) (*v1alpha1.Addressable, error)
+	DeleteAddressable(ctx context.Context, name string, options DeleteOptions) error
+	UpdateAddressable(ctx context.Context, device *v1alpha1.Addressable, options UpdateOptions) (*v1alpha1.Addressable, error)
+	GetAddressable(ctx context.Context, name string, options GetOptions) (*v1alpha1.Addressable, error)
+	ListAddressables(ctx context.Context, options ListOptions) ([]v1alpha1.Addressable, error)
+}
+
+// DeviceProfileInterface defines the interfaces which used to create, delete, update, get and list DeviceProfile objects on edge-side platform
+type DeviceProfileInterface interface {
+	Create(ctx context.Context, deviceProfile *v1alpha1.DeviceProfile, options CreateOptions) (*v1alpha1.DeviceProfile, error)
+	Delete(ctx context.Context, name string, options DeleteOptions) error
+	Update(ctx context.Context, deviceProfile *v1alpha1.DeviceProfile, options UpdateOptions) (*v1alpha1.DeviceProfile, error)
+	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.DeviceProfile, error)
+	List(ctx context.Context, options ListOptions) ([]v1alpha1.DeviceProfile, error)
+}
+
+// ValueDescriptorInterface defines the interfaces which used to create, delete, update, get and list valueDescriptor objects on edge-side platform
+type ValueDescriptorInterface interface {
+	Create(ctx context.Context, valueDescriptor *v1alpha1.ValueDescriptor, options CreateOptions) (*v1alpha1.ValueDescriptor, error)
+	Delete(ctx context.Context, name string, options DeleteOptions) error
+	Update(ctx context.Context, valueDescriptor *v1alpha1.ValueDescriptor, options UpdateOptions) (*v1alpha1.ValueDescriptor, error)
+	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.ValueDescriptor, error)
+	List(ctx context.Context, options ListOptions) ([]v1alpha1.ValueDescriptor, error)
+}
