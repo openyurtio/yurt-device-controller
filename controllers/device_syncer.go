@@ -21,26 +21,50 @@ import (
 	"strings"
 	"time"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
+	edgeCli "github.com/openyurtio/device-controller/clients"
+	efCli "github.com/openyurtio/device-controller/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/controllers/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlmgr "sigs.k8s.io/controller-runtime/pkg/manager"
-
-	devv1 "github.com/openyurtio/device-controller/api/v1alpha1"
-	coremetacli "github.com/openyurtio/device-controller/clients/core-metadata"
 )
 
 type DeviceSyncer struct {
+	// kubernetes client
+	client.Client
+	// which nodePool deviceController is deployed in
+	NodePool string
+	// edge platform's client
+	deviceCli edgeCli.DeviceInterface
 	// syncing period in seconds
 	syncPeriod time.Duration
-	// EdgeX core-data-service's client
-	*coremetacli.CoreMetaClient
-	// Kubernetes client
-	client.Client
-	log logr.Logger
+	log        logr.Logger
+}
+
+// NewDeviceSyncer initialize a New DeviceSyncer
+func NewDeviceSyncer(client client.Client,
+	logr logr.Logger,
+	periodSecs uint32, cfg *rest.Config) (DeviceSyncer, error) {
+	log := logr.WithName("syncer").WithName("Device")
+	coreMetaCliInfo := efCli.ClientURL{Host: "edgex-core-metadata", Port: 48081}
+	coreCmdCliInfo := efCli.ClientURL{Host: "edgex-core-command", Port: 48082}
+
+	nodePool, err := util.GetNodePool(cfg)
+	if err != nil {
+		return DeviceSyncer{}, err
+	}
+
+	return DeviceSyncer{
+		syncPeriod: time.Duration(periodSecs) * time.Second,
+		deviceCli:  efCli.NewEdgexDeviceClient(coreMetaCliInfo, coreCmdCliInfo, logr),
+		Client:     client,
+		log:        log,
+		NodePool:   nodePool,
+	}, nil
 }
 
 // NewDeviceSyncerRunnablel initialize a controller-runtime manager runnable
@@ -52,149 +76,182 @@ func (ds *DeviceSyncer) NewDeviceSyncerRunnablel() ctrlmgr.RunnableFunc {
 }
 
 func (ds *DeviceSyncer) Run(stop <-chan struct{}) {
-	ds.log.Info("starting the DeviceSyncer...")
+	ds.log.V(1).Info("starting the DeviceSyncer...")
 	go func() {
 		for {
 			<-time.After(ds.syncPeriod)
-			// list devices on edgex foundry
-			eDevs, err := ds.ListDevices()
+			// 1. get device on edge platform and OpenYurt
+			edgeDevices, kubeDevices, err := ds.getAllDevices()
 			if err != nil {
-				ds.log.Error(err, "fail to list the devices object on the EdgeX Foundry")
+				ds.log.V(3).Error(err, "fail to list the devices")
 				continue
 			}
-			// list devices on Kubernetes
-			var kDevs devv1.DeviceList
-			if err := ds.List(context.TODO(), &kDevs); err != nil {
-				ds.log.Error(err, "fail to list the devices object on the Kubernetes")
+
+			// 2. find the device that need to be synchronized
+			redundantEdgeDevices, redundantKubeDevices, syncedDevices := ds.findDiffDevice(edgeDevices, kubeDevices)
+			ds.log.V(1).Info("The number of devices waiting for synchronization",
+				"Edge device should be added to OpenYurt", len(redundantEdgeDevices),
+				"OpenYurt device that should be deleted", len(redundantKubeDevices),
+				"Devices that should be synchronized", len(syncedDevices))
+
+			// 3. create device on OpenYurt which are exists in edge platform but not in OpenYurt
+			if err := ds.syncEdgeToKube(redundantEdgeDevices); err != nil {
+				ds.log.V(3).Error(err, "fail to create devices on OpenYurt")
 				continue
 			}
-			// create the devices on Kubernetes but not on EdgeX
-			newKDevs := findNewDevices(eDevs, kDevs.Items)
-			if len(newKDevs) != 0 {
-				if err := createDevices(ds.log, ds.Client, newKDevs); err != nil {
-					ds.log.Error(err, "fail to create devices")
-					continue
-				}
+
+			// 4. delete redundant device on OpenYurt
+			if err := ds.deleteDevices(redundantKubeDevices); err != nil {
+				ds.log.V(3).Error(err, "fail to delete redundant devices on OpenYurt")
+				continue
 			}
-			ds.log.V(5).Info("new devices not found")
+
+			// 5. update device status on OpenYurt
+			if err := ds.updateDevices(syncedDevices); err != nil {
+				ds.log.Error(err, "fail to update devices status")
+				continue
+			}
+
+			ds.log.V(1).Info("One round of Device synchronization is complete")
+
 		}
 	}()
 
 	<-stop
-	ds.log.Info("stopping the device syncer")
+	ds.log.V(1).Info("stopping the device syncer")
 }
 
-// NewDeviceSyncer initialize a New DeviceSyncer
-func NewDeviceSyncer(client client.Client,
-	logr logr.Logger,
-	periodSecs uint32) DeviceSyncer {
-	log := logr.WithName("syncer").WithName("Device")
-	return DeviceSyncer{
-		syncPeriod: time.Duration(periodSecs) * time.Second,
-		CoreMetaClient: coremetacli.NewCoreMetaClient(
-			"edgex-core-metadata.default", 48081, log),
-		Client: client,
-		log:    log,
+// Get the existing Device on the Edge platform, as well as OpenYurt existing Device
+// edgeDevice：map[actualName]device
+// kubeDevice：map[actualName]device
+func (ds *DeviceSyncer) getAllDevices() (map[string]devicev1alpha1.Device, map[string]devicev1alpha1.Device, error) {
+	edgeDevice := map[string]devicev1alpha1.Device{}
+	kubeDevice := map[string]devicev1alpha1.Device{}
+	// 1. list devices on edge platform
+	eDevs, err := ds.deviceCli.List(nil, edgeCli.ListOptions{})
+	if err != nil {
+		ds.log.V(4).Error(err, "fail to list the devices object on the Edge Platform")
+		return edgeDevice, kubeDevice, err
 	}
-}
-
-// findNewDevices finds devices that have been created on the EdgeX but
-// not the Kubernetes
-func findNewDevices(
-	edgeXDevs []models.Device,
-	kubeDevs []devv1.Device) []models.Device {
-	var retDevs []models.Device
-	for _, exd := range edgeXDevs {
-		var exist bool
-		for _, kd := range kubeDevs {
-			if strings.ToLower(exd.Name) == kd.Name {
-				exist = true
-				break
-			}
-		}
-		if !exist {
-			retDevs = append(retDevs, exd)
-		}
+	// 2. list devices on OpenYurt (filter objects belonging to edgeServer)
+	var kDevs devicev1alpha1.DeviceList
+	listOptions := client.MatchingFields{"spec.nodePool": ds.NodePool}
+	if err = ds.List(context.TODO(), &kDevs, listOptions); err != nil {
+		ds.log.V(4).Error(err, "fail to list the devices object on the OpenYurt")
+		return edgeDevice, kubeDevice, err
+	}
+	for i := range eDevs {
+		deviceName := getActualName(&eDevs[i])
+		edgeDevice[deviceName] = eDevs[i]
 	}
 
-	return retDevs
+	for i := range kDevs.Items {
+		deviceName := getActualName(&kDevs.Items[i])
+		kubeDevice[deviceName] = kDevs.Items[i]
+	}
+	return edgeDevice, kubeDevice, nil
 }
 
-// createDevices creates the list of devices
-func createDevices(log logr.Logger, cli client.Client, edgeXDevs []models.Device) error {
-	for _, ed := range edgeXDevs {
-		kd := toKubeDevice(ed)
-		if err := cli.Create(context.TODO(), &kd); err != nil {
+// Get the list of devices that need to be added, deleted and updated
+func (ds *DeviceSyncer) findDiffDevice(
+	edgeDevice map[string]devicev1alpha1.Device, kubeDevice map[string]devicev1alpha1.Device) (
+	redundantEdgeDevices map[string]*devicev1alpha1.Device, redundantKubeDevices map[string]*devicev1alpha1.Device, syncedDevices map[string]*devicev1alpha1.Device) {
+
+	redundantEdgeDevices = map[string]*devicev1alpha1.Device{}
+	redundantKubeDevices = map[string]*devicev1alpha1.Device{}
+	syncedDevices = map[string]*devicev1alpha1.Device{}
+
+	for n := range edgeDevice {
+		tmp := edgeDevice[n]
+		edName := getActualName(&tmp)
+		if _, exists := kubeDevice[edName]; !exists {
+			ed := edgeDevice[n]
+			redundantEdgeDevices[edName] = ds.completeCreateContent(&ed)
+		} else {
+			kd := kubeDevice[edName]
+			ed := edgeDevice[edName]
+			syncedDevices[edName] = ds.completeUpdateContent(&kd, &ed)
+		}
+	}
+
+	for n, v := range kubeDevice {
+		if !v.Status.Synced {
+			continue
+		}
+		tmp := kubeDevice[n]
+		kdName := getActualName(&tmp)
+		if _, exists := edgeDevice[kdName]; !exists {
+			kd := kubeDevice[n]
+			redundantKubeDevices[kdName] = &kd
+		}
+	}
+	return
+}
+
+// syncEdgeToKube creates device on OpenYurt which are exists in edge platform but not in OpenYurt
+func (ds *DeviceSyncer) syncEdgeToKube(edgeDevs map[string]*devicev1alpha1.Device) error {
+	for _, ed := range edgeDevs {
+		if err := ds.Client.Create(context.TODO(), ed); err != nil {
 			if apierrors.IsAlreadyExists(err) {
-				log.Info("Device already exist on Kubernetes",
-					"device", strings.ToLower(ed.Name))
 				continue
 			}
-			log.Error(err, "fail to create the Device on Kubernetes",
-				"device", ed.Name)
+			ds.log.V(5).Info("created device failed:",
+				"device", strings.ToLower(ed.Name))
 			return err
 		}
 	}
 	return nil
 }
 
-// toKubeDevice serialize the EdgeX Device to the corresponding Kubernetes Device
-func toKubeDevice(ed models.Device) devv1.Device {
-	var loc string
-	if ed.Location != nil {
-		loc = ed.Location.(string)
+// deleteDevices deletes redundant device on OpenYurt
+func (ds *DeviceSyncer) deleteDevices(redundantKubeDevices map[string]*devicev1alpha1.Device) error {
+	for i := range redundantKubeDevices {
+		if err := ds.Client.Delete(context.TODO(), redundantKubeDevices[i]); err != nil {
+			ds.log.V(5).Error(err, "fail to delete the Device on OpenYurt",
+				"device", redundantKubeDevices[i].Name)
+			return err
+		}
 	}
-	return devv1.Device{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      strings.ToLower(ed.Name),
-			Namespace: "default",
-			Labels: map[string]string{
-				EdgeXObjectName: ed.Name,
-			},
-		},
-		Spec: devv1.DeviceSpec{
-			Description:    ed.Description,
-			AdminState:     toKubeAdminState(ed.AdminState),
-			OperatingState: toKubeOperatingState(ed.OperatingState),
-			Protocols:      toKubeProtocols(ed.Protocols),
-			Labels:         ed.Labels,
-			Location:       loc,
-			Service:        ed.Service.Name,
-			Profile:        ed.Profile.Name,
-		},
-		Status: devv1.DeviceStatus{
-			LastConnected: ed.LastConnected,
-			LastReported:  ed.LastReported,
-			AddedToEdgeX:  true,
-			Id:            ed.Id,
-		},
-	}
+	return nil
 }
 
-// toKubeDevice serialize the EdgeX AdminState to the corresponding Kubernetes AdminState
-func toKubeAdminState(ea models.AdminState) devv1.AdminState {
-	if ea == models.Locked {
-		return devv1.Locked
+// updateDevicesStatus updates device status on OpenYurt
+func (ds *DeviceSyncer) updateDevices(syncedDevices map[string]*devicev1alpha1.Device) error {
+	for n := range syncedDevices {
+		if err := ds.Client.Status().Update(context.TODO(), syncedDevices[n]); err != nil {
+			if apierrors.IsConflict(err) {
+				ds.log.Info("----Conflict")
+				continue
+			}
+			return err
+		}
 	}
-	return devv1.UnLocked
+	return nil
 }
 
-// toKubeDevice serialize the EdgeX OperatingState to the corresponding
-// Kubernetes OperatingState
-func toKubeOperatingState(ea models.OperatingState) devv1.OperatingState {
-	if ea == models.Enabled {
-		return devv1.Enabled
-	}
-	return devv1.Disabled
+// completeCreateContent completes the content of the device which will be created on OpenYurt
+func (ds *DeviceSyncer) completeCreateContent(edgeDevice *devicev1alpha1.Device) *devicev1alpha1.Device {
+	createDevice := edgeDevice.DeepCopy()
+	createDevice.Spec.NodePool = ds.NodePool
+	createDevice.Name = strings.Join([]string{ds.NodePool, createDevice.Name}, "-")
+	createDevice.Spec.Managed = false
+
+	return createDevice
 }
 
-// toKubeProtocols serialize the EdgeX ProtocolProperties to the corresponding
-// Kubernetes OperatingState
-func toKubeProtocols(
-	eps map[string]models.ProtocolProperties) map[string]devv1.ProtocolProperties {
-	ret := map[string]devv1.ProtocolProperties{}
-	for k, v := range eps {
-		ret[k] = devv1.ProtocolProperties(v)
-	}
-	return ret
+// completeUpdateContent completes the content of the device which will be updated on OpenYurt
+func (ds *DeviceSyncer) completeUpdateContent(kubeDevice *devicev1alpha1.Device, edgeDevice *devicev1alpha1.Device) *devicev1alpha1.Device {
+	updatedDevice := kubeDevice.DeepCopy()
+	_, aps, _ := ds.deviceCli.ListPropertiesState(nil, updatedDevice, edgeCli.ListOptions{})
+	// update device status
+	updatedDevice.Status.LastConnected = edgeDevice.Status.LastConnected
+	updatedDevice.Status.LastReported = edgeDevice.Status.LastReported
+	updatedDevice.Status.AdminState = edgeDevice.Status.AdminState
+	updatedDevice.Status.OperatingState = edgeDevice.Status.OperatingState
+	updatedDevice.Status.DeviceProperties = aps
+	return updatedDevice
+}
+
+func getActualName(d *devicev1alpha1.Device) string {
+	return d.Labels[EdgeXObjectName]
 }

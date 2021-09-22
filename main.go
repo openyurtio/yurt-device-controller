@@ -112,7 +112,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Device")
 		os.Exit(1)
 	}
-	ds := controllers.NewDeviceSyncer(mgr.GetClient(), mgr.GetLogger(), EdgeXSyncPeriodSecs)
+	ds, err := controllers.NewDeviceSyncer(mgr.GetClient(), mgr.GetLogger(), EdgeXSyncPeriodSecs, mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create syncer", "controller", "Device")
+		os.Exit(1)
+	}
 	mgr.Add(ds.NewDeviceSyncerRunnablel())
 	setupLog.Info("add device syncer")
 

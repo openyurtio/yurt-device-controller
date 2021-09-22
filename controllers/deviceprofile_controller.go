@@ -22,13 +22,13 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/go-logr/logr"
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	devcli "github.com/openyurtio/device-controller/clients"
 	edgexclis "github.com/openyurtio/device-controller/clients/edgex-foundry"
@@ -117,7 +117,7 @@ func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 // SetupWithManager sets up the controller with the Manager.
 func (r *DeviceProfileReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.edgeClient = edgexclis.NewEdgexDeviceProfile(
-		"edgex-core-metadata.default", 48081, r.Log)
+		"edgex-core-metadata", 48081, r.Log)
 	nodePool, err := util.GetNodePool(mgr.GetConfig())
 	if err != nil {
 		return err
