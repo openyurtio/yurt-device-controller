@@ -124,7 +124,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "DeviceService")
 		os.Exit(1)
 	}
-	dss := controllers.NewDeviceServiceSyncer(mgr.GetClient(), mgr.GetLogger(), EdgeXSyncPeriodSecs)
+	dss, err := controllers.NewDeviceServiceSyncer(mgr.GetClient(), mgr.GetLogger(), EdgeXSyncPeriodSecs, mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create syncer", "syncer", "DeviceService")
+		os.Exit(1)
+	}
 	mgr.Add(dss.NewDeviceServiceSyncerRunnable())
 	setupLog.Info("add device service syncer")
 	//+kubebuilder:scaffold:builder

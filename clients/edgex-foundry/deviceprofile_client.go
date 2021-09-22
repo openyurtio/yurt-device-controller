@@ -41,11 +41,6 @@ type EdgexDeviceProfile struct {
 	logr.Logger
 }
 
-const (
-	DeviceProfilePath = "/api/v1/deviceprofile"
-	EdgeXObjectName   = "device-controller/edgex-object.name"
-)
-
 func NewEdgexDeviceProfile(host string, port int, log logr.Logger) *EdgexDeviceProfile {
 	return &EdgexDeviceProfile{
 		Client: resty.New(),

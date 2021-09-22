@@ -68,7 +68,8 @@ spec:
                           type: string
                       type: object
                     id:
-                      description: Id is a unique identifier, such as a UUID
+                      description: EdgeId is a unique identifier used by EdgeX Foundry,
+                        such as a UUID
                       type: string
                     name:
                       description: Command name (unique on the profile)
@@ -246,10 +247,9 @@ spec:
                   - properties
                   type: object
                 type: array
-              id:
-                type: string
               labels:
-                description: Labels used to search for groups of profiles
+                description: Labels used to search for groups of profiles on EdgeX
+                  Foundry
                 items:
                   type: string
                 type: array
@@ -259,12 +259,18 @@ spec:
               model:
                 description: Model of the device
                 type: string
+              nodePool:
+                description: NodePool specifies which nodePool the deviceProfile belongs
+                  to
+                type: string
             type: object
           status:
             description: DeviceProfileStatus defines the observed state of DeviceProfile
             properties:
-              addedToEdgeX:
+              Synced:
                 type: boolean
+              id:
+                type: string
             type: object
         type: object
     served: true
