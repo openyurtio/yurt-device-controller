@@ -18,8 +18,6 @@ package controllers
 
 import (
 	"context"
-	"github.com/openyurtio/device-controller/controllers/util"
-	"k8s.io/client-go/rest"
 	"strings"
 	"time"
 
@@ -27,8 +25,10 @@ import (
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	iotcli "github.com/openyurtio/device-controller/clients"
 	edgexCli "github.com/openyurtio/device-controller/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/controllers/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 )

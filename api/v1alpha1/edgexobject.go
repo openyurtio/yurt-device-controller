@@ -29,5 +29,5 @@ func (dp *DeviceProfile) IsAddedToEdgeX() bool {
 }
 
 func (d *Device) IsAddedToEdgeX() bool {
-	return d.Status.AddedToEdgeX
+	return d.Status.Synced
 }

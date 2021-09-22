@@ -18,6 +18,15 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
+)
+
+const (
+	DeviceFinalizer = "v1alpha1.device.finalizer"
+	// DeviceSyncedCondition indicates that the device exists in both OpenYurt and edge platform
+	DeviceSyncedCondition clusterv1.ConditionType = "DeviceSynced"
+	// DeviceManagingCondition indicates that the device is being managed by cloud and its properties are being reconciled
+	DeviceManagingCondition clusterv1.ConditionType = "DeviceManaging"
 )
 
 type AdminState string
@@ -38,6 +47,7 @@ type ProtocolProperties map[string]string
 
 // DeviceSpec defines the desired state of Device
 type DeviceSpec struct {
+	// Information describing the device
 	Description string `json:"description,omitempty"`
 	// Admin state (locked/unlocked)
 	AdminState AdminState `json:"adminState,omitempty"`
@@ -54,9 +64,15 @@ type DeviceSpec struct {
 	Service string `json:"service"`
 	// Associated Device Profile - Describes the device
 	Profile string `json:"profile"`
+	// True means device is managed by cloud, cloud can update the related fields
+	// False means cloud can't update the fields
+	Managed bool `json:"managed,omitempty"`
+	// NodePool indicates which nodePool the device comes from
+	NodePool string `json:"nodePool,omitempty"`
 	// TODO support the following field
 	// A list of auto-generated events coming from the device
 	// AutoEvents     []AutoEvent                   `json:"autoEvents"`
+	// DeviceProperties represents the expected state of the device's properties
 	DeviceProperties map[string]DesiredPropertyState `json:"deviceProperties,omitempty"`
 }
 
@@ -80,11 +96,18 @@ type DeviceStatus struct {
 	// Time (milliseconds) that the device reported data to the core
 	// microservice
 	LastReported int64 `json:"lastReported,omitempty"`
-	// AddedToEdgeX indicates whether the object has been successfully
-	// created on EdgeX Foundry
-	AddedToEdgeX     bool                           `json:"addedToEdgeX,omitempty"`
+	// Synced indicates whether the device already exists on both OpenYurt and edge platform
+	Synced bool `json:"synced,omitempty"`
+	// it represents the actual state of the device's properties
 	DeviceProperties map[string]ActualPropertyState `json:"deviceProperties,omitempty"`
-	Id               string                         `json:"id,omitempty"`
+	EdgeId           string                         `json:"edgeId,omitempty"`
+	// Admin state (locked/unlocked)
+	AdminState AdminState `json:"adminState,omitempty"`
+	// Operating state (enabled/disabled)
+	OperatingState OperatingState `json:"operatingState,omitempty"`
+	// current device state
+	// +optional
+	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -97,6 +120,14 @@ type Device struct {
 
 	Spec   DeviceSpec   `json:"spec,omitempty"`
 	Status DeviceStatus `json:"status,omitempty"`
+}
+
+func (d *Device) SetConditions(conditions clusterv1.Conditions) {
+	d.Status.Conditions = conditions
+}
+
+func (d *Device) GetConditions() clusterv1.Conditions {
+	return d.Status.Conditions
 }
 
 //+kubebuilder:object:root=true

@@ -23,12 +23,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/go-logr/logr"
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	devcli "github.com/openyurtio/device-controller/clients"
 	edgexclis "github.com/openyurtio/device-controller/clients/edgex-foundry"
@@ -58,7 +58,7 @@ func NewDeviceProfileSyncer(client client.Client,
 	}
 	return DeviceProfileSyncer{
 		syncPeriod: time.Duration(periodSecs) * time.Second,
-		edgeClient: edgexclis.NewEdgexDeviceProfile("edgex-core-metadata.default", 48081, log),
+		edgeClient: edgexclis.NewEdgexDeviceProfile("edgex-core-metadata", 48081, log),
 		Client:     client,
 		log:        log,
 		NodePool:   nodePool,

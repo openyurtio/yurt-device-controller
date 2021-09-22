@@ -20,13 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	"github.com/go-logr/logr"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/edgexfoundry/go-mod-core-contracts/models"
+	"github.com/go-logr/logr"
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	clis "github.com/openyurtio/device-controller/clients"
 	coredatacli "github.com/openyurtio/device-controller/clients/core-data"
@@ -77,7 +76,7 @@ func (r *ValueDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ValueDescriptorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.CoreDataClient = coredatacli.NewCoreDataClient("edgex-core-data.default", 48080, r.Log)
+	r.CoreDataClient = coredatacli.NewCoreDataClient("edgex-core-data", 48080, r.Log)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&devicev1alpha1.ValueDescriptor{}).
 		WithEventFilter(genFirstUpdateFilter("valuedescriptor", r.Log)).
