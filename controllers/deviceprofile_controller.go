@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +29,7 @@ import (
 
 	"github.com/go-logr/logr"
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
+	clis "github.com/openyurtio/device-controller/clients"
 	devcli "github.com/openyurtio/device-controller/clients"
 	edgexclis "github.com/openyurtio/device-controller/clients/edgex-foundry"
 	"github.com/openyurtio/device-controller/controllers/util"
@@ -59,27 +59,24 @@ func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	dpName := util.GetEdgeNameTrimNodePool(curdp.GetName(), r.NodePool)
-	var prevdp devicev1alpha1.DeviceProfile
+	dpActualName := util.GetEdgeDeviceProfileName(&curdp, EdgeXObjectName)
+	var prevdp *devicev1alpha1.DeviceProfile
 	var exist bool
-	edps, err := r.edgeClient.List(context.Background(), devcli.ListOptions{})
-	if err != nil {
+	prevdp, err := r.edgeClient.Get(context.Background(), dpActualName, devcli.GetOptions{})
+	if err == nil {
+		exist = true
+	} else if clis.IsNotFoundErr(err) {
+		exist = false
+	} else {
 		return ctrl.Result{}, err
-	}
-	for _, edp := range edps {
-		if strings.ToLower(edp.Name) == dpName {
-			prevdp = edp
-			exist = true
-			break
-		}
 	}
 
 	if !curdp.ObjectMeta.DeletionTimestamp.IsZero() {
 		if exist {
-			if err := r.edgeClient.Delete(context.Background(), prevdp.Name, devcli.DeleteOptions{}); err != nil {
+			if err := r.edgeClient.Delete(context.Background(), dpActualName, devcli.DeleteOptions{}); err != nil {
 				return ctrl.Result{}, fmt.Errorf("Fail to delete DeviceProfile on Edgex: %v", err)
 			}
-			log.Info("Successfully delete DeviceProfile on EdgeX", "DeviceProfile", prevdp.Name)
+			log.Info("Successfully delete DeviceProfile on EdgeX", "DeviceProfile", dpActualName)
 		}
 		controllerutil.RemoveFinalizer(&curdp, "devicecontroller.openyurt.io")
 		err := r.Update(context.TODO(), &curdp)

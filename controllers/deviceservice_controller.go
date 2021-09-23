@@ -64,13 +64,18 @@ func (r *DeviceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	log.V(4).Info("Reconciling the DeviceService object", "DeviceService", ds.GetName())
 	// Update deviceService conditions
 	defer func() {
+		if ds.Spec.Managed != true {
+			conditions.MarkFalse(&ds, devicev1alpha1.DeviceServiceManagingCondition, "this deviceService is not managed by openyurt", clusterv1.ConditionSeverityInfo, "")
+		}
 		conditions.SetSummary(&ds,
 			conditions.WithConditions(
 				devicev1alpha1.DeviceServiceSyncedCondition, devicev1alpha1.DeviceServiceManagingCondition),
 		)
 		err := r.Status().Update(ctx, &ds)
 		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "update deviceService conditions failed", "deviceService")
+			if !apierrors.IsConflict(err) {
+				log.V(4).Error(err, "update deviceService conditions failed", "deviceService", ds.GetName())
+			}
 		}
 	}()
 
@@ -128,7 +133,7 @@ func (r *DeviceServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *DeviceServiceReconciler) reconcileDeleteDeviceService(ctx context.Context, ds *devicev1alpha1.DeviceService) error {
 	// gets the actual name of deviceService on the edge platform from the Label of the device
-	edgeDeviceServiceName := ds.ObjectMeta.Labels[EdgeXObjectName]
+	edgeDeviceServiceName := util.GetEdgeDeviceServiceName(ds, EdgeXObjectName)
 	if ds.ObjectMeta.DeletionTimestamp.IsZero() {
 		if len(ds.GetFinalizers()) == 0 {
 			patchString := map[string]interface{}{
@@ -170,10 +175,10 @@ func (r *DeviceServiceReconciler) reconcileDeleteDeviceService(ctx context.Conte
 
 func (r *DeviceServiceReconciler) reconcileCreateDeviceService(ctx context.Context, ds *devicev1alpha1.DeviceService, log logr.Logger) error {
 	// get the actual name of deviceService on the Edge platform from the Label of the device
-	edgeDeviceName := ds.ObjectMeta.Labels[EdgeXObjectName]
+	edgeDeviceServiceName := util.GetEdgeDeviceServiceName(ds, EdgeXObjectName)
 	log.V(4).Info("Checking if deviceService already exist on the edge platform", "deviceService", ds.GetName())
 	// Checking if deviceService already exist on the edge platform
-	if edgeDs, err := r.deviceServiceCli.Get(nil, edgeDeviceName, edgeInterface.GetOptions{}); err != nil {
+	if edgeDs, err := r.deviceServiceCli.Get(nil, edgeDeviceServiceName, edgeInterface.GetOptions{}); err != nil {
 		if !clis.IsNotFoundErr(err) {
 			log.V(4).Error(err, "fail to visit the edge platform")
 			return nil

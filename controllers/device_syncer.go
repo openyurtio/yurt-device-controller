@@ -141,12 +141,12 @@ func (ds *DeviceSyncer) getAllDevices() (map[string]devicev1alpha1.Device, map[s
 		return edgeDevice, kubeDevice, err
 	}
 	for i := range eDevs {
-		deviceName := getActualName(&eDevs[i])
+		deviceName := util.GetEdgeDeviceName(&eDevs[i], EdgeXObjectName)
 		edgeDevice[deviceName] = eDevs[i]
 	}
 
 	for i := range kDevs.Items {
-		deviceName := getActualName(&kDevs.Items[i])
+		deviceName := util.GetEdgeDeviceName(&kDevs.Items[i], EdgeXObjectName)
 		kubeDevice[deviceName] = kDevs.Items[i]
 	}
 	return edgeDevice, kubeDevice, nil
@@ -163,7 +163,7 @@ func (ds *DeviceSyncer) findDiffDevice(
 
 	for n := range edgeDevice {
 		tmp := edgeDevice[n]
-		edName := getActualName(&tmp)
+		edName := util.GetEdgeDeviceName(&tmp, EdgeXObjectName)
 		if _, exists := kubeDevice[edName]; !exists {
 			ed := edgeDevice[n]
 			redundantEdgeDevices[edName] = ds.completeCreateContent(&ed)
@@ -179,7 +179,7 @@ func (ds *DeviceSyncer) findDiffDevice(
 			continue
 		}
 		tmp := kubeDevice[n]
-		kdName := getActualName(&tmp)
+		kdName := util.GetEdgeDeviceName(&tmp, EdgeXObjectName)
 		if _, exists := edgeDevice[kdName]; !exists {
 			kd := kubeDevice[n]
 			redundantKubeDevices[kdName] = &kd
@@ -250,8 +250,4 @@ func (ds *DeviceSyncer) completeUpdateContent(kubeDevice *devicev1alpha1.Device,
 	updatedDevice.Status.OperatingState = edgeDevice.Status.OperatingState
 	updatedDevice.Status.DeviceProperties = aps
 	return updatedDevice
-}
-
-func getActualName(d *devicev1alpha1.Device) string {
-	return d.Labels[EdgeXObjectName]
 }
