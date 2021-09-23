@@ -67,14 +67,16 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.V(4).Info("Reconciling the Device object", "Device", d.GetName())
 	// Update the conditions for device
 	defer func() {
+		if d.Spec.Managed != true {
+			conditions.MarkFalse(&d, devicev1alpha1.DeviceManagingCondition, "this device is not managed by openyurt", clusterv1.ConditionSeverityInfo, "")
+		}
 		conditions.SetSummary(&d,
 			conditions.WithConditions(devicev1alpha1.DeviceSyncedCondition, devicev1alpha1.DeviceManagingCondition),
 		)
 		err := r.Status().Update(ctx, &d)
 		if client.IgnoreNotFound(err) != nil {
 			if !apierrors.IsConflict(err) {
-				log.Info("err", "Conditions", d.Status.Conditions)
-				log.Error(err, "update device conditions failed")
+				log.V(4).Error(err, "update device conditions failed", "device", d.GetName())
 			}
 		}
 	}()
@@ -136,7 +138,7 @@ func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *DeviceReconciler) reconcileDeleteDevice(ctx context.Context, d *devicev1alpha1.Device, log logr.Logger) error {
 	// gets the actual name of the device on the Edge platform from the Label of the device
-	edgeDeviceName := d.ObjectMeta.Labels[EdgeXObjectName]
+	edgeDeviceName := util.GetEdgeDeviceName(d, EdgeXObjectName)
 	if d.ObjectMeta.DeletionTimestamp.IsZero() {
 		if len(d.GetFinalizers()) == 0 {
 			patchData, _ := json.Marshal(map[string]interface{}{
@@ -170,7 +172,7 @@ func (r *DeviceReconciler) reconcileDeleteDevice(ctx context.Context, d *devicev
 
 func (r *DeviceReconciler) reconcileCreateDevice(ctx context.Context, d *devicev1alpha1.Device, log logr.Logger) error {
 	// get the actual name of the device on the Edge platform from the Label of the device
-	edgeDeviceName := d.ObjectMeta.Labels[EdgeXObjectName]
+	edgeDeviceName := util.GetEdgeDeviceName(d, EdgeXObjectName)
 	newDeviceStatus := d.Status.DeepCopy()
 	log.V(4).Info("Checking if device already exist on the edge platform", "device", d.GetName())
 	// Checking if device already exist on the edge platform
@@ -246,7 +248,7 @@ func (r *DeviceReconciler) reconcileUpdateDevice(ctx context.Context, d *devicev
 	} else if len(failedPropertyNames) != 0 {
 		err = fmt.Errorf("the following device properties failed to reconcile: %v", failedPropertyNames)
 		conditions.MarkFalse(d, devicev1alpha1.DeviceManagingCondition, err.Error(), clusterv1.ConditionSeverityInfo, "")
-		return err
+		return nil
 	}
 	conditions.MarkTrue(d, devicev1alpha1.DeviceManagingCondition)
 	return nil

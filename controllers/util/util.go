@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 )
 
 const (
@@ -66,9 +68,32 @@ func GetNodePool(cfg *rest.Config) (string, error) {
 	return nodePool, err
 }
 
-func GetEdgeNameTrimNodePool(kubeName, NodePoolName string) string {
-	if NodePoolName == "" {
-		return kubeName
+func GetEdgeDeviceServiceName(ds *devicev1alpha1.DeviceService, label string) string {
+	var actualDSName string
+	if _, ok := ds.ObjectMeta.Labels[label]; ok {
+		actualDSName = ds.ObjectMeta.Labels[label]
+	} else {
+		actualDSName = ds.GetName()
 	}
-	return strings.TrimPrefix(kubeName, fmt.Sprintf("%s-", NodePoolName))
+	return actualDSName
+}
+
+func GetEdgeDeviceName(d *devicev1alpha1.Device, label string) string {
+	var actualDeviceName string
+	if _, ok := d.ObjectMeta.Labels[label]; ok {
+		actualDeviceName = d.ObjectMeta.Labels[label]
+	} else {
+		actualDeviceName = d.GetName()
+	}
+	return actualDeviceName
+}
+
+func GetEdgeDeviceProfileName(dp *devicev1alpha1.DeviceProfile, label string) string {
+	var actualDPName string
+	if _, ok := dp.ObjectMeta.Labels[label]; ok {
+		actualDPName = dp.ObjectMeta.Labels[label]
+	} else {
+		actualDPName = dp.GetName()
+	}
+	return actualDPName
 }

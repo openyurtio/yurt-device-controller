@@ -128,8 +128,9 @@ func findNewUpdateDeviceProfile(edgeXDevs, kubeDevs []devicev1alpha1.DeviceProfi
 	var addDevs, updateDevs []devicev1alpha1.DeviceProfile
 	for _, exd := range edgeXDevs {
 		var exist bool
-		for _, kd := range kubeDevs {
-			if strings.ToLower(exd.Name) == util.GetEdgeNameTrimNodePool(kd.Name, kd.Spec.NodePool) {
+		for i, kd := range kubeDevs {
+			dp := kubeDevs[i]
+			if exd.Name == strings.ToLower(util.GetEdgeDeviceProfileName(&dp, EdgeXObjectName)) {
 				exist = true
 				if !reflect.DeepEqual(exd.Spec, kd.Spec) {
 					kd.Spec = exd.Spec
@@ -151,8 +152,9 @@ func findDeleteDeviceProfile(edgeXDevs, kubeDevs []devicev1alpha1.DeviceProfile)
 	var deleteDevs []devicev1alpha1.DeviceProfile
 	for _, kd := range kubeDevs {
 		var exist bool
-		for _, exd := range edgeXDevs {
-			if strings.ToLower(exd.Name) == util.GetEdgeNameTrimNodePool(kd.Name, kd.Spec.NodePool) {
+		for i, exd := range edgeXDevs {
+			dp := edgeXDevs[i]
+			if exd.Name == strings.ToLower(util.GetEdgeDeviceProfileName(&dp, EdgeXObjectName)) {
 				exist = true
 				break
 			}

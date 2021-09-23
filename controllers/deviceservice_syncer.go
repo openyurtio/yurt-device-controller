@@ -138,12 +138,12 @@ func (ds *DeviceServiceSyncer) getAllDeviceServices() (
 		return edgeDeviceServices, kubeDeviceServices, err
 	}
 	for i := range eDevSs {
-		deviceServicesName := eDevSs[i].Labels[EdgeXObjectName]
+		deviceServicesName := util.GetEdgeDeviceServiceName(&eDevSs[i], EdgeXObjectName)
 		edgeDeviceServices[deviceServicesName] = eDevSs[i]
 	}
 
 	for i := range kDevSs.Items {
-		deviceServicesName := kDevSs.Items[i].Labels[EdgeXObjectName]
+		deviceServicesName := util.GetEdgeDeviceServiceName(&kDevSs.Items[i], EdgeXObjectName)
 		kubeDeviceServices[deviceServicesName] = kDevSs.Items[i]
 	}
 	return edgeDeviceServices, kubeDeviceServices, nil
@@ -158,8 +158,9 @@ func (ds *DeviceServiceSyncer) findDiffDeviceServices(
 	redundantKubeDeviceServices = map[string]*devicev1alpha1.DeviceService{}
 	syncedDeviceServices = map[string]*devicev1alpha1.DeviceService{}
 
-	for n, v := range edgeDeviceService {
-		edName := v.Labels[EdgeXObjectName]
+	for n := range edgeDeviceService {
+		eds := edgeDeviceService[n]
+		edName := util.GetEdgeDeviceServiceName(&eds, EdgeXObjectName)
 		if _, exists := kubeDeviceService[edName]; !exists {
 			ed := edgeDeviceService[n]
 			redundantEdgeDeviceServices[edName] = ds.completeCreateContent(&ed)
@@ -174,7 +175,8 @@ func (ds *DeviceServiceSyncer) findDiffDeviceServices(
 		if !v.Status.Synced {
 			continue
 		}
-		kdName := v.Labels[EdgeXObjectName]
+		kds := kubeDeviceService[k]
+		kdName := util.GetEdgeDeviceServiceName(&kds, EdgeXObjectName)
 		if _, exists := edgeDeviceService[kdName]; !exists {
 			kd := kubeDeviceService[k]
 			redundantKubeDeviceServices[kdName] = &kd
