@@ -10,6 +10,21 @@ This repository contains three CRD/controllers, Device, DeviceService and Device
 
 For details of the design, please see the [document](https://github.com/openyurtio/openyurt/blob/master/docs/proposals/20210310-edge-device-management.md).
 
+## Architecture
+
+Yurt-device-controller introduces an approach leverages existing edge computing platforms, like EdgeX Foundry, and uses Kubernetes custom resources to abstract edge devices. 
+Inspiring by the Unix philosophy, "Do one thing and do it well", we believe that Kubernetes should focus on managing computing resources while edge devices management can be done by adopting existing edge computing platforms. 
+Therefore, we define several generic custom resource definitions(CRD) that act as the mediator between OpenYurt and the edge platform. 
+Any existing edge platforms can be integrated into the OpenYurt by implementing custom controllers for these CRDs. These CRDS and corresponding controllers allow users to manage edge devices in a declarative way, which provides users with a Kubernetes-native experience and reduces the complexity of managing, operating and maintaining edge platform devices.
+
+![yurt-device-controller-architecture](docs/img/yurt-device-controller-architecture.png)
+
+The major Yurt-Device-Controller components consist of:
+
+- **Device controller**: It can abstract device objects in the edge platform into device CRs and synchronize them to the cloud. With the support of device controller, users can influence the actual device on the edge platform through the operation of cloud device CR, such as creating a device, deleting a device, updating device attributes (such as setting the light on and off, etc.).
+- **DeviceService controller**: It can abstract deviceService objects in the edge platform into deviceService CRs and synchronize them to the cloud. With the support of deviceService Controller, users can view deviceService information of edge platforms in the cloud, and create or delete deviceService CRs to affect the actual deviceService of edge platforms.
+- **DeviceProfile controller**: It can abstract deviceProfile objects in the edge platform into deviceProfile CRs and synchronize them to the cloud. With the support of deviceProfile Controller, users can view deviceProfile information of edge platforms in the cloud, and create or delete deviceProfile CRs to affect the actual deviceService of edge platforms.
+
 ## Getting Start
 
 To use the yurt-device-controller, you need to deploy the OpenYurt cluster in advance and meet the following two conditions:

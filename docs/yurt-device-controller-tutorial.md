@@ -479,3 +479,16 @@ The following operation uses `random-boolean-device` device, which is automatica
    {"device":"random-boolean-device","origin":1632378327952106491,"readings":[{"origin":1632378327951971484,"device":"random-boolean-device","name":"Bool","value":"false","valueType":"Bool"}],"EncodedEvent":null}
    ```
 
+## Make binary or image
+
+1. User can build the binary for local testing, golang v1.15+ is required. The generated binary file is in path `~\yurt-device-controller\bin\manager` .
+   ```bash
+   $ cd yurt-device-controller
+   $ make build
+   ```
+2. User can build image for local testing, golang v1.15+ and docker environment are required.
+   ```bash
+   $ cd yurt-device-controller
+   $ make docker-build IMG=<ImageName:version>
+   ```
+   
