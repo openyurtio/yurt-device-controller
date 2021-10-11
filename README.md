@@ -12,9 +12,9 @@ For details of the design, please see the [document](https://github.com/openyurt
 
 ## Architecture
 
-Yurt-device-controller introduces an approach leverages existing edge computing platforms, like EdgeX Foundry, and uses Kubernetes custom resources to abstract edge devices. 
-Inspiring by the Unix philosophy, "Do one thing and do it well", we believe that Kubernetes should focus on managing computing resources while edge devices management can be done by adopting existing edge computing platforms. 
-Therefore, we define several generic custom resource definitions(CRD) that act as the mediator between OpenYurt and the edge platform. 
+Yurt-device-controller introduces an approach leverages existing edge computing platforms, like EdgeX Foundry, and uses Kubernetes custom resources to abstract edge devices.
+Inspiring by the Unix philosophy, "Do one thing and do it well", we believe that Kubernetes should focus on managing computing resources while edge devices management can be done by adopting existing edge computing platforms.
+Therefore, we define several generic custom resource definitions(CRD) that act as the mediator between OpenYurt and the edge platform.
 Any existing edge platforms can be integrated into the OpenYurt by implementing custom controllers for these CRDs. These CRDS and corresponding controllers allow users to manage edge devices in a declarative way, which provides users with a Kubernetes-native experience and reduces the complexity of managing, operating and maintaining edge platform devices.
 
 ![yurt-device-controller-architecture](docs/img/yurt-device-controller-architecture.png)
@@ -47,7 +47,6 @@ Contributions are welcome, whether by creating new issues or pull requests. See 
 <div align="left">
     <img src="https://github.com/openyurtio/openyurt/blob/master/docs/img/ding.jpg" width=25% title="dingtalk">
 </div>
-
 
 ## License
 

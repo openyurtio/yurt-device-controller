@@ -85,13 +85,13 @@ spec:
             terminationGracePeriodSeconds: 10
   topology:
     pools:
-    - name: hangzhou 
+    - name: hangzhou
       nodeSelectorTerm:
         matchExpressions:
         - key: apps.openyurt.io/nodepool
           operator: In
           values:
-          - hangzhou 
+          - hangzhou
       replicas: 1
       tolerations:
       - effect: NoSchedule
@@ -143,8 +143,6 @@ This tutorial shows how to manipulate object instances in the Edgex Foundry by u
    EOF
    ```
 
-
-
 2. Create a deviceProfile
 
    ```bash
@@ -184,8 +182,6 @@ This tutorial shows how to manipulate object instances in the Edgex Foundry by u
    EOF
    ```
 
-
-
 3. Create a device
 
    Create a device using the deviceService and deviceProfile created above:
@@ -210,8 +206,6 @@ This tutorial shows how to manipulate object instances in the Edgex Foundry by u
        other: {}
    EOF
    ```
-
-
 
 ### Delete Device, DeviceService, DeviceProfile
 
@@ -239,7 +233,7 @@ The following operation uses `random-boolean-device` device, which is automatica
    NAME                             AGE
    hangzhou-random-boolean-device   23h
    hangzhou-random-integer-device   23h
-   
+
    $ kubectl describe device hangzhou-random-boolean-device
    Name:         hangzhou-random-boolean-device
    Namespace:    default
@@ -297,8 +291,6 @@ The following operation uses `random-boolean-device` device, which is automatica
      Synced:            true
    Events:              <none>
    ```
-
-
 
 2. Set the `managed` field of device to `true`
 
@@ -375,8 +367,6 @@ The following operation uses `random-boolean-device` device, which is automatica
      Synced:            true
    ```
 
-
-
 4. Change the `operatingState` of device
 
    > The operating state (aka op state) provides an indication on the part of EdgeX about the internal operating status of the device service. The operating state is not set externally (as by another system or man), it is a signal from within EdgeX (and potentially the device service itself) about the condition of the service. The operating state of the device service may be either enabled or disabled. When the operating state of the device service is disabled, it is either experiencing some difficulty or going through some process (for example an upgrade) which does not allow it to function in its normal capacity.
@@ -405,14 +395,12 @@ The following operation uses `random-boolean-device` device, which is automatica
      Synced:                  true
    ```
 
-
-
 5. Set the deviceProperties
 
    ```bash
    # Ensure adminState = UNLOCKED
    $ kubectl patch devices.device.openyurt.io hangzhou-random-boolean-device -p '{"spec":{"adminState":"UNLOCKED"}}'  --type=merge
-   
+
    # Ensure operatingState = ENABLED
    $ kubectl patch devices.device.openyurt.io hangzhou-random-boolean-device -p '{"spec":{"operatingState":"ENABLED"}}'  --type=merge
    ```
@@ -460,8 +448,8 @@ The following operation uses `random-boolean-device` device, which is automatica
    "spec":{
      "deviceProperties":{
        "Bool":{
-         "desiredValue":"false", 
-         "name":"Bool", 
+         "desiredValue":"false",
+         "name":"Bool",
          "putURL":"http://edgex-core-command:48082/api/v1/device/07b0d343-cc07-43ff-afb1-6a2792d48b7f/command/9a61a8d5-7c15-4d1b-b552-15b7879d9fc8"
        }
      }
@@ -474,7 +462,7 @@ The following operation uses `random-boolean-device` device, which is automatica
    ```bash
    $ kubectl get service | grep edgex-core-command
    edgex-core-command                     NodePort    10.96.39.34     <none>        48082:30082/TCP                  39h
-   
+
    $ curl http://10.96.39.34:48082/api/v1/device/07b0d343-cc07-43ff-afb1-6a2792d48b7f/command/9a61a8d5-7c15-4d1b-b552-15b7879d9fc8
    {"device":"random-boolean-device","origin":1632378327952106491,"readings":[{"origin":1632378327951971484,"device":"random-boolean-device","name":"Bool","value":"false","valueType":"Bool"}],"EncodedEvent":null}
    ```
@@ -491,4 +479,3 @@ The following operation uses `random-boolean-device` device, which is automatica
    $ cd yurt-device-controller
    $ make docker-build IMG=<ImageName:version>
    ```
-   

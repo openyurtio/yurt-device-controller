@@ -118,7 +118,7 @@ func (ds *DeviceProfileSyncer) Run(stop <-chan struct{}) {
 }
 
 func addNodePoolField(edgeXDevs []devicev1alpha1.DeviceProfile, NodePoolName string) {
-	for i, _ := range edgeXDevs {
+	for i := range edgeXDevs {
 		edgeXDevs[i].Spec.NodePool = NodePoolName
 	}
 }
