@@ -18,6 +18,7 @@ package clients
 
 import (
 	"context"
+
 	"github.com/openyurtio/device-controller/api/v1alpha1"
 )
 
