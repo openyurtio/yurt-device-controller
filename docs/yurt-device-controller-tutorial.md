@@ -55,7 +55,7 @@ spec:
               - --metrics-bind-address=127.0.0.1:8080
               - --leader-elect=false
               command:
-              - /manager
+              - /yurt-device-controller
               image: openyurt/yurt-device-controller:latest
               imagePullPolicy: IfNotPresent
               livenessProbe:
@@ -469,13 +469,26 @@ The following operation uses `random-boolean-device` device, which is automatica
 
 ## Make binary or image
 
-1. User can build the binary for local testing, golang v1.15+ is required. The generated binary file is in path `~\yurt-device-controller\bin\manager` .
+1. User can build the binary for local testing, golang v1.15+ is required. The generated binary file is in path `~/yurt-device-controller/_output/bin/$(go env GOOS)/$(go env GOARCH)/yurt-device-controller`
    ```bash
    $ cd yurt-device-controller
-   $ make build
+   # ARGS:
+   #   GOOS: the target operating system (i.e., linux, darwin)
+   #   GOARCH: the target architecture (i.e., amd64, arm64, arm)
+   $ make build GOOS=linux GOARCH=amd64
    ```
-2. User can build image for local testing, golang v1.15+ and docker environment are required.
+2. User can build image for local testing, docker environment are required.
    ```bash
    $ cd yurt-device-controller
-   $ make docker-build IMG=<ImageName:version>
+   # ARGS:
+   #   REPO: image repo
+   #   TAG:  image tag
+   #   ARCH: list of target architectures.
+   #   REGION: in which region this rule is executed, if in mainland China, set it as cn.
+   $ make release REPO=openyurt TAG=latest ARCH="amd64 arm64 arm" REGION=cn
+   ```
+3. Clear the compiled files
+   ```bash
+   $ cd yurt-device-controller
+   $ make clean
    ```

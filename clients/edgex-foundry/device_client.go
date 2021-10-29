@@ -289,7 +289,8 @@ func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *d
 		} else {
 			var event models.Event
 			if err := json.Unmarshal(resp.Body(), &event); err != nil {
-				return dps, aps, err
+				efc.V(5).Error(err, "failed to decode the response ", "response", resp)
+				continue
 			}
 			actualValue := getPropertyValueFromEvent(c.Name, event)
 			aps[c.Name] = devicev1alpha1.ActualPropertyState{Name: c.Name, GetURL: c.Get.URL, ActualValue: actualValue}
@@ -301,10 +302,18 @@ func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *d
 // The actual property value is resolved from the returned event
 func getPropertyValueFromEvent(propertyName string, modelEvent models.Event) string {
 	actualValue := ""
-	for _, k := range modelEvent.Readings {
-		if propertyName == k.Name {
-			actualValue = k.Value
-			break
+	if len(modelEvent.Readings) == 1 {
+		if propertyName == modelEvent.Readings[0].Name {
+			actualValue = modelEvent.Readings[0].Value
+		}
+	} else {
+		for _, k := range modelEvent.Readings {
+			currentProperty := strings.Join([]string{k.Name, k.Value}, ":")
+			if actualValue == "" {
+				actualValue = currentProperty
+			} else {
+				actualValue = strings.Join([]string{actualValue, currentProperty}, ", ")
+			}
 		}
 	}
 	return actualValue
