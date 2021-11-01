@@ -1,3 +1,7 @@
+_output
+.DS_Store
+gopath
+dockerbuild
 
 # Binaries for programs and plugins
 *.exe
@@ -20,6 +24,7 @@ testbin/*
 
 # editor and IDE paraphernalia
 .idea
+.vscode
 *.swp
 *.swo
 *~

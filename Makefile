@@ -20,9 +20,44 @@ test: generate fmt vet manifests
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
 
-# Build manager binary
-build: generate fmt vet
-	go build -o bin/manager main.go
+# Build binaries
+# ARGS:
+#   GOOS: the target operating system (i.e., linux, darwin)
+#   GOARCH: the target architecture (i.e., amd64, arm64, arm)
+#
+# Examples:
+#   # compile yurt-device-controller with architectures arm64,
+#   make build GOOS=linux GOARCH=arm64
+#
+#   # build binary in the host environment
+#   make build
+build:
+	bash hack/make-rules/build.sh
+
+# Build binaries and docker images.
+# NOTE: this rule can take time, as we build binaries inside containers
+#
+# ARGS:
+#   REPO: image repo.
+#   TAG:  image tag
+#   ARCH: list of target architectures.
+#   REGION: in which region this rule is executed, if in mainland China,
+#   	set it as cn.
+#
+# Examples:
+#   # compile yurt-device-controller with architectures arm64 and amd64 in the mainland China,
+#   # generate images named openyurt/yurt-device-controller:latest-arm64 and openyurt/yurt-device-controller:latest-amd64
+#   make release REPO="openyurt" TAG="latest" ARCH="arm64 amd64" REGION=cn
+#
+#   # compile yurt-device-controller with all architectures (i.e., amd64, arm64, arm)
+#   make release
+release:
+	bash hack/make-rules/release-images.sh
+
+clean:
+	-rm -Rf bin
+	-rm -Rf _output
+	-rm -Rf dockerbuild
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
@@ -70,15 +105,6 @@ generate: controller-gen
 		paths="./api/v1alpha1/deviceprofile_types.go" \
 		paths="./api/v1alpha1/valuedescriptor_types.go" \
 		paths="./api/v1alpha1/groupversion_info.go"
-
-# Build the docker image
-# docker-build: test
-docker-build:
-	docker build -t ${IMG} .
-
-# Push the docker image
-docker-push:
-	docker push ${IMG}
 
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
