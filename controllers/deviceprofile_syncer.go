@@ -87,7 +87,8 @@ func (ds *DeviceProfileSyncer) Run(stop <-chan struct{}) {
 			addNodePoolField(eDevs, ds.NodePool)
 			// list devices on Kubernetes
 			var kDevs devicev1alpha1.DeviceProfileList
-			if err := ds.List(context.TODO(), &kDevs); err != nil {
+			listOptions := client.MatchingFields{"spec.nodePool": ds.NodePool}
+			if err := ds.List(context.TODO(), &kDevs, listOptions); err != nil {
 				ds.log.Error(err, "fail to list the deviceprofile object on the Kubernetes")
 				continue
 			}
