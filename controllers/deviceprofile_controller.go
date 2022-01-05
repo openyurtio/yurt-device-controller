@@ -121,6 +121,14 @@ func (r *DeviceProfileReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	r.NodePool = nodePool
 
+	// register the filter field for deviceprofile
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &devicev1alpha1.DeviceProfile{}, "spec.nodePool", func(rawObj client.Object) []string {
+		profile := rawObj.(*devicev1alpha1.DeviceProfile)
+		return []string{profile.Spec.NodePool}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&devicev1alpha1.DeviceProfile{}).
 		WithEventFilter(genFirstUpdateFilter("deviceprofile", r.Log)).
