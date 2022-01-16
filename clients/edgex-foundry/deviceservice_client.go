@@ -25,37 +25,34 @@ import (
 	"strings"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	"github.com/go-logr/logr"
 	"github.com/go-resty/resty/v2"
+	"k8s.io/klog/v2"
+
 	"github.com/openyurtio/device-controller/api/v1alpha1"
 	edgeCli "github.com/openyurtio/device-controller/clients"
 )
 
 type EdgexDeviceServiceClient struct {
 	*resty.Client
-	CoreMetaClient ClientURL
-	logr.Logger
+	CoreMetaAddr string
 }
 
-func NewEdgexDeviceServiceClient(coreMetaClient ClientURL, log logr.Logger) *EdgexDeviceServiceClient {
+func NewEdgexDeviceServiceClient(coreMetaAddr string) *EdgexDeviceServiceClient {
 	return &EdgexDeviceServiceClient{
-		Client:         resty.New(),
-		CoreMetaClient: coreMetaClient,
-		Logger:         log,
+		Client:       resty.New(),
+		CoreMetaAddr: coreMetaAddr,
 	}
 }
 
 // Create function sends a POST request to EdgeX to add a new deviceService
 func (eds *EdgexDeviceServiceClient) Create(ctx context.Context, deviceservice *v1alpha1.DeviceService, options edgeCli.CreateOptions) (*v1alpha1.DeviceService, error) {
 	ds := toEdgexDeviceService(deviceservice)
-	eds.V(5).Info("will add the DeviceServices",
-		"DeviceService", ds.Name)
+	klog.V(5).InfoS("will add the DeviceServices", "DeviceService", ds.Name)
 	dpJson, err := json.Marshal(&ds)
 	if err != nil {
 		return nil, err
 	}
-	postPath := fmt.Sprintf("http://%s:%d%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, DeviceServicePath)
+	postPath := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, DeviceServicePath)
 	resp, err := eds.R().
 		SetBody(dpJson).Post(postPath)
 	if err != nil {
@@ -70,10 +67,8 @@ func (eds *EdgexDeviceServiceClient) Create(ctx context.Context, deviceservice *
 
 // Delete function sends a request to EdgeX to delete a deviceService
 func (eds *EdgexDeviceServiceClient) Delete(ctx context.Context, name string, option edgeCli.DeleteOptions) error {
-	eds.V(5).Info("will delete the DeviceService",
-		"DeviceService", name)
-	delURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, DeviceServicePath, name)
+	klog.V(5).InfoS("will delete the DeviceService", "DeviceService", name)
+	delURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, DeviceServicePath, name)
 	resp, err := eds.R().Delete(delURL)
 	if err != nil {
 		return err
@@ -88,8 +83,7 @@ func (eds *EdgexDeviceServiceClient) Delete(ctx context.Context, name string, op
 // TODO support to update other fields
 func (eds *EdgexDeviceServiceClient) Update(ctx context.Context, ds *v1alpha1.DeviceService, options edgeCli.UpdateOptions) (*v1alpha1.DeviceService, error) {
 	actualDSName := getEdgeDeviceServiceName(ds)
-	putBaseURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, DeviceServicePath, actualDSName)
+	putBaseURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, DeviceServicePath, actualDSName)
 	if ds == nil {
 		return nil, nil
 	}
@@ -116,11 +110,9 @@ func (eds *EdgexDeviceServiceClient) Update(ctx context.Context, ds *v1alpha1.De
 
 // Get is used to query the deviceService information corresponding to the deviceService name
 func (eds *EdgexDeviceServiceClient) Get(ctx context.Context, name string, options edgeCli.GetOptions) (*v1alpha1.DeviceService, error) {
-	eds.V(5).Info("will get DeviceServices",
-		"DeviceService", name)
+	klog.V(5).InfoS("will get DeviceServices", "DeviceService", name)
 	var ds v1alpha1.DeviceService
-	getURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, DeviceServicePath, name)
+	getURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, DeviceServicePath, name)
 	resp, err := eds.R().Get(getURL)
 	if err != nil {
 		return &ds, err
@@ -138,9 +130,8 @@ func (eds *EdgexDeviceServiceClient) Get(ctx context.Context, name string, optio
 // List is used to get all deviceService objects on edge platform
 // The Hanoi version currently supports only a single label and does not support other filters
 func (eds *EdgexDeviceServiceClient) List(ctx context.Context, options edgeCli.ListOptions) ([]v1alpha1.DeviceService, error) {
-	eds.V(5).Info("will list DeviceServices")
-	lp := fmt.Sprintf("http://%s:%d%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, DeviceServicePath)
+	klog.V(5).Info("will list DeviceServices")
+	lp := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, DeviceServicePath)
 	if options.LabelSelector != nil {
 		if _, ok := options.LabelSelector["label"]; ok {
 			lp = strings.Join([]string{lp, strings.Join([]string{"label", options.LabelSelector["label"]}, "/")}, "/")
@@ -166,14 +157,12 @@ func (eds *EdgexDeviceServiceClient) List(ctx context.Context, options edgeCli.L
 // CreateAddressable function sends a POST request to EdgeX to add a new addressable
 func (eds *EdgexDeviceServiceClient) CreateAddressable(ctx context.Context, addressable *v1alpha1.Addressable, options edgeCli.CreateOptions) (*v1alpha1.Addressable, error) {
 	as := toEdgeXAddressable(addressable)
-	eds.V(5).Info("will add the Addressables",
-		"Addressable", as.Name)
+	klog.V(5).InfoS("will add the Addressable", "Addressable", as.Name)
 	dpJson, err := json.Marshal(&as)
 	if err != nil {
 		return nil, err
 	}
-	postPath := fmt.Sprintf("http://%s:%d%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, AddressablePath)
+	postPath := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, AddressablePath)
 	resp, err := eds.R().
 		SetBody(dpJson).Post(postPath)
 	if err != nil {
@@ -186,10 +175,8 @@ func (eds *EdgexDeviceServiceClient) CreateAddressable(ctx context.Context, addr
 
 // DeleteAddressable function sends a request to EdgeX to delete a addressable
 func (eds *EdgexDeviceServiceClient) DeleteAddressable(ctx context.Context, name string, options edgeCli.DeleteOptions) error {
-	eds.V(5).Info("will delete the Addressable",
-		"Addressable", name)
-	delURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, AddressablePath, name)
+	klog.V(5).InfoS("will delete the Addressable", "Addressable", name)
+	delURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, AddressablePath, name)
 	resp, err := eds.R().Delete(delURL)
 	if err != nil {
 		return err
@@ -207,11 +194,9 @@ func (eds *EdgexDeviceServiceClient) UpdateAddressable(ctx context.Context, devi
 
 // GetAddressable is used to query the addressable information corresponding to the addressable name
 func (eds *EdgexDeviceServiceClient) GetAddressable(ctx context.Context, name string, options edgeCli.GetOptions) (*v1alpha1.Addressable, error) {
-	eds.V(5).Info("will get Addressables",
-		"Addressable", name)
+	klog.V(5).InfoS("will get Addressable", "Addressable", name)
 	var addressable v1alpha1.Addressable
-	getURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, AddressablePath, name)
+	getURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, AddressablePath, name)
 	resp, err := eds.R().Get(getURL)
 	if err != nil {
 		return &addressable, err
@@ -227,9 +212,8 @@ func (eds *EdgexDeviceServiceClient) GetAddressable(ctx context.Context, name st
 
 // ListAddressables is used to get all addressable objects on edge platform
 func (eds *EdgexDeviceServiceClient) ListAddressables(ctx context.Context, options edgeCli.ListOptions) ([]v1alpha1.Addressable, error) {
-	eds.V(5).Info("will list Addressables")
-	lp := fmt.Sprintf("http://%s:%d%s",
-		eds.CoreMetaClient.Host, eds.CoreMetaClient.Port, AddressablePath)
+	klog.V(5).Info("will list Addressables")
+	lp := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, AddressablePath)
 	resp, err := eds.R().
 		EnableTrace().
 		Get(lp)

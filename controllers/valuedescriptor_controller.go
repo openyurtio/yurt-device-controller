@@ -20,23 +20,23 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/edgexfoundry/go-mod-core-contracts/models"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	"github.com/go-logr/logr"
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	clis "github.com/openyurtio/device-controller/clients"
-	coredatacli "github.com/openyurtio/device-controller/clients/core-data"
+	edgexCli "github.com/openyurtio/device-controller/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
 )
 
 // ValueDescriptorReconciler reconciles a ValueDescriptor object
 type ValueDescriptorReconciler struct {
 	client.Client
-	Log    logr.Logger
 	Scheme *runtime.Scheme
-	*coredatacli.CoreDataClient
+	*edgexCli.EdgexValueDescriptorClient
 }
 
 //+kubebuilder:rbac:groups=device.openyurt.io,resources=valuedescriptors,verbs=get;list;watch;create;update;patch;delete
@@ -44,7 +44,6 @@ type ValueDescriptorReconciler struct {
 //+kubebuilder:rbac:groups=device.openyurt.io,resources=valuedescriptors/finalizers,verbs=update
 
 func (r *ValueDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("valuedescriptor", req.NamespacedName)
 	var vd devicev1alpha1.ValueDescriptor
 	if err := r.Get(ctx, req.NamespacedName, &vd); err != nil {
 		return ctrl.Result{}, err
@@ -53,11 +52,11 @@ func (r *ValueDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// NOTE this version does not support valuedescriptor update
 	_, err := r.GetValueDescriptorByName(vd.GetName())
 	if err == nil {
-		log.Info("ValueDescriptor already exists on EdgeX")
+		klog.V(2).Info("ValueDescriptor already exists on edge platform")
 		return ctrl.Result{}, nil
 	}
 	if !clis.IsNotFoundErr(err) {
-		log.Info("Fail to visit the Edgex core-data-service")
+		klog.V(2).Info("Fail to visit the edge platform's core-data-service")
 		return ctrl.Result{}, nil
 	}
 
@@ -66,7 +65,7 @@ func (r *ValueDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("Fail to add ValueDescriptor to Edgex: %v", err)
 	}
-	log.V(4).Info("Successfully add ValueDescriptor to Edgex",
+	klog.V(4).InfoS("Successfully add ValueDescriptor to edge platform",
 		"ValueDescriptor", vd.GetName(), "EdgexId", edgexId)
 	vd.Spec.Id = edgexId
 	vd.Status.AddedToEdgeX = true
@@ -75,11 +74,11 @@ func (r *ValueDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ValueDescriptorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.CoreDataClient = coredatacli.NewCoreDataClient("edgex-core-data", 48080, r.Log)
+func (r *ValueDescriptorReconciler) SetupWithManager(mgr ctrl.Manager, opts *options.YurtDeviceControllerOptions) error {
+	r.EdgexValueDescriptorClient = edgexCli.NewValueDescriptorClient(opts.CoreDataAddr)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&devicev1alpha1.ValueDescriptor{}).
-		WithEventFilter(genFirstUpdateFilter("valuedescriptor", r.Log)).
+		WithEventFilter(genFirstUpdateFilter("valuedescriptor")).
 		Complete(r)
 }
 

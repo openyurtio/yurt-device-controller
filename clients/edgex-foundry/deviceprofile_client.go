@@ -24,31 +24,28 @@ import (
 	"net/http"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	"github.com/go-logr/logr"
 	"github.com/go-resty/resty/v2"
+	"k8s.io/klog/v2"
+
 	"github.com/openyurtio/device-controller/api/v1alpha1"
 	devcli "github.com/openyurtio/device-controller/clients"
-	strutil "github.com/openyurtio/device-controller/controllers/util/strings"
+	strutil "github.com/openyurtio/device-controller/controllers/util"
 )
 
 type EdgexDeviceProfile struct {
 	*resty.Client
-	Host string
-	Port int
-	logr.Logger
+	CoreMetaAddr string
 }
 
-func NewEdgexDeviceProfile(host string, port int, log logr.Logger) *EdgexDeviceProfile {
+func NewEdgexDeviceProfile(coreMetaAddr string) *EdgexDeviceProfile {
 	return &EdgexDeviceProfile{
-		Client: resty.New(),
-		Host:   host,
-		Port:   port,
-		Logger: log,
+		Client:       resty.New(),
+		CoreMetaAddr: coreMetaAddr,
 	}
 }
 
-func getListDeviceProfileURL(host string, port int, opts devcli.ListOptions) (string, error) {
-	url := fmt.Sprintf("http://%s:%d%s", host, port, DeviceProfilePath)
+func getListDeviceProfileURL(address string, opts devcli.ListOptions) (string, error) {
+	url := fmt.Sprintf("http://%s%s", address, DeviceProfilePath)
 	if len(opts.LabelSelector) > 1 {
 		return url, fmt.Errorf("Multiple labels: list only support one label")
 	}
@@ -70,8 +67,8 @@ func getListDeviceProfileURL(host string, port int, opts devcli.ListOptions) (st
 }
 
 func (cdc *EdgexDeviceProfile) List(ctx context.Context, opts devcli.ListOptions) ([]v1alpha1.DeviceProfile, error) {
-	cdc.V(5).Info("will list DeviceProfiles")
-	lp, err := getListDeviceProfileURL(cdc.Host, cdc.Port, opts)
+	klog.V(5).Info("will list DeviceProfiles")
+	lp, err := getListDeviceProfileURL(cdc.CoreMetaAddr, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -91,9 +88,9 @@ func (cdc *EdgexDeviceProfile) List(ctx context.Context, opts devcli.ListOptions
 }
 
 func (cdc *EdgexDeviceProfile) Get(ctx context.Context, name string, opts devcli.GetOptions) (*v1alpha1.DeviceProfile, error) {
-	cdc.V(5).Info("will get DeviceProfiles", "DeviceProfile", name)
+	klog.V(5).Infof("will get DeviceProfiles: %s", name)
 	var dp models.DeviceProfile
-	getURL := fmt.Sprintf("http://%s:%d%s/name/%s", cdc.Host, cdc.Port, DeviceProfilePath, name)
+	getURL := fmt.Sprintf("http://%s%s/name/%s", cdc.CoreMetaAddr, DeviceProfilePath, name)
 	resp, err := cdc.R().Get(getURL)
 	if err != nil {
 		return nil, err
@@ -114,7 +111,7 @@ func (cdc *EdgexDeviceProfile) Create(ctx context.Context, deviceProfile *v1alph
 	if err != nil {
 		return nil, err
 	}
-	postURL := fmt.Sprintf("http://%s:%d%s", cdc.Host, cdc.Port, DeviceProfilePath)
+	postURL := fmt.Sprintf("http://%s%s", cdc.CoreMetaAddr, DeviceProfilePath)
 	resp, err := cdc.R().SetBody(dpJson).Post(postURL)
 	if err != nil {
 		return nil, err
@@ -133,8 +130,8 @@ func (cdc *EdgexDeviceProfile) Update(ctx context.Context, deviceProfile *v1alph
 }
 
 func (cdc *EdgexDeviceProfile) Delete(ctx context.Context, name string, opts devcli.DeleteOptions) error {
-	cdc.V(5).Info("will delete the DeviceProfile", "DeviceProfile", name)
-	delURL := fmt.Sprintf("http://%s:%d%s/name/%s", cdc.Host, cdc.Port, DeviceProfilePath, name)
+	klog.V(5).Infof("will delete the DeviceProfile: %s", name)
+	delURL := fmt.Sprintf("http://%s%s/name/%s", cdc.CoreMetaAddr, DeviceProfilePath, name)
 	resp, err := cdc.R().Delete(delURL)
 	if err != nil {
 		return err

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package core_data
+package edgex_foundry
 
 import (
 	"encoding/json"
@@ -22,35 +22,29 @@ import (
 	"fmt"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	"github.com/go-logr/logr"
 	"github.com/go-resty/resty/v2"
+	"k8s.io/klog/v2"
 )
 
-type CoreDataClient struct {
+type EdgexValueDescriptorClient struct {
 	*resty.Client
-	Host string
-	Port int
-	logr.Logger
+	CoreDataAddr string
 }
 
 const (
 	ValueDescriptorPath = "/api/v1/valuedescriptor"
 )
 
-func NewCoreDataClient(host string, port int, log logr.Logger) *CoreDataClient {
-	return &CoreDataClient{
-		Client: resty.New(),
-		Host:   host,
-		Port:   port,
-		Logger: log,
+func NewValueDescriptorClient(address string) *EdgexValueDescriptorClient {
+	return &EdgexValueDescriptorClient{
+		Client:       resty.New(),
+		CoreDataAddr: address,
 	}
 }
 
-func (cdc *CoreDataClient) ListValueDescriptor() (
-	[]models.ValueDescriptor, error) {
-	cdc.V(5).Info("will list ValueDescriptors")
-	lp := fmt.Sprintf("http://%s:%d%s",
-		cdc.Host, cdc.Port, ValueDescriptorPath)
+func (cdc *EdgexValueDescriptorClient) ListValueDescriptor() ([]models.ValueDescriptor, error) {
+	klog.V(5).Info("will list ValueDescriptors")
+	lp := fmt.Sprintf("http://%s%s", cdc.CoreDataAddr, ValueDescriptorPath)
 	resp, err := cdc.R().
 		EnableTrace().
 		Get(lp)
@@ -64,13 +58,11 @@ func (cdc *CoreDataClient) ListValueDescriptor() (
 	return vds, nil
 }
 
-func (cdc *CoreDataClient) GetValueDescriptorByName(name string) (
+func (cdc *EdgexValueDescriptorClient) GetValueDescriptorByName(name string) (
 	models.ValueDescriptor, error) {
-	cdc.V(5).Info("will get ValueDescriptors",
-		"valuedescriptor", name)
+	klog.V(5).InfoS("will get ValueDescriptors", "valuedescriptor", name)
 	var vd models.ValueDescriptor
-	getURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		cdc.Host, cdc.Port, ValueDescriptorPath, name)
+	getURL := fmt.Sprintf("http://%s%s/name/%s", cdc.CoreDataAddr, ValueDescriptorPath, name)
 	resp, err := cdc.R().Get(getURL)
 	if err != nil {
 		return vd, err
@@ -82,21 +74,18 @@ func (cdc *CoreDataClient) GetValueDescriptorByName(name string) (
 	return vd, err
 }
 
-func (cdc *CoreDataClient) GetValueDescriptsByLabel(label string) (
-	[]models.ValueDescriptor, error) {
+func (cdc *EdgexValueDescriptorClient) GetValueDescriptsByLabel(label string) ([]models.ValueDescriptor, error) {
 	panic("NOT IMPLEMENT YET")
 }
 
-func (cdc *CoreDataClient) AddValueDescript(vd models.ValueDescriptor) (
+func (cdc *EdgexValueDescriptorClient) AddValueDescript(vd models.ValueDescriptor) (
 	string, error) {
-	cdc.V(5).Info("will add the ValueDescriptors",
-		"valuedescriptor", vd.Name)
+	klog.V(5).InfoS("will add the ValueDescriptors", "valuedescriptor", vd.Name)
 	vdJson, err := json.Marshal(&vd)
 	if err != nil {
 		return "", err
 	}
-	postPath := fmt.Sprintf("http://%s:%d%s",
-		cdc.Host, cdc.Port, ValueDescriptorPath)
+	postPath := fmt.Sprintf("http://%s%s", cdc.CoreDataAddr, ValueDescriptorPath)
 	resp, err := cdc.R().
 		SetBody(vdJson).Post(postPath)
 	if err != nil {
@@ -105,11 +94,9 @@ func (cdc *CoreDataClient) AddValueDescript(vd models.ValueDescriptor) (
 	return string(resp.Body()), err
 }
 
-func (cdc *CoreDataClient) DeleteValueDescriptorByName(name string) error {
-	cdc.V(5).Info("will delete the ValueDescriptor",
-		"valuedescriptor", name)
-	delURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		cdc.Host, cdc.Port, ValueDescriptorPath, name)
+func (cdc *EdgexValueDescriptorClient) DeleteValueDescriptorByName(name string) error {
+	klog.V(5).InfoS("will delete the ValueDescriptor", "valuedescriptor", name)
+	delURL := fmt.Sprintf("http://%s%s/name/%s", cdc.CoreDataAddr, ValueDescriptorPath, name)
 	resp, err := cdc.R().Delete(delURL)
 	if err != nil {
 		return err
