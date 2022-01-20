@@ -25,39 +25,36 @@ import (
 	"strings"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	"github.com/go-logr/logr"
 	"github.com/go-resty/resty/v2"
+	"k8s.io/klog/v2"
+
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	edgeCli "github.com/openyurtio/device-controller/clients"
 )
 
 type EdgexDeviceClient struct {
 	*resty.Client
-	CoreMetaClient    ClientURL
-	CoreCommandClient ClientURL
-	logr.Logger
+	CoreMetaAddr    string
+	CoreCommandAddr string
 }
 
-func NewEdgexDeviceClient(coreMetaClient, coreCommandClient ClientURL, log logr.Logger) *EdgexDeviceClient {
+func NewEdgexDeviceClient(coreMetaAddr, coreCommandAddr string) *EdgexDeviceClient {
 	return &EdgexDeviceClient{
-		Client:            resty.New(),
-		CoreMetaClient:    coreMetaClient,
-		CoreCommandClient: coreCommandClient,
-		Logger:            log,
+		Client:          resty.New(),
+		CoreMetaAddr:    coreMetaAddr,
+		CoreCommandAddr: coreCommandAddr,
 	}
 }
 
 // Create function sends a POST request to EdgeX to add a new device
 func (efc *EdgexDeviceClient) Create(ctx context.Context, device *devicev1alpha1.Device, options edgeCli.CreateOptions) (*devicev1alpha1.Device, error) {
 	dp := toEdgeXDevice(device)
-	efc.V(5).Info("will add the Devices",
-		"Device", dp.Name)
+	klog.V(5).Infof("will add the Devices: %s", dp.Name)
 	dpJson, err := json.Marshal(&dp)
 	if err != nil {
 		return nil, err
 	}
-	postPath := fmt.Sprintf("http://%s:%d%s",
-		efc.CoreMetaClient.Host, efc.CoreMetaClient.Port, DevicePath)
+	postPath := fmt.Sprintf("http://%s%s", efc.CoreMetaAddr, DevicePath)
 	resp, err := efc.R().
 		SetBody(dpJson).Post(postPath)
 	if err != nil {
@@ -73,10 +70,8 @@ func (efc *EdgexDeviceClient) Create(ctx context.Context, device *devicev1alpha1
 
 // Delete function sends a request to EdgeX to delete a device
 func (efc *EdgexDeviceClient) Delete(ctx context.Context, name string, options edgeCli.DeleteOptions) error {
-	efc.V(5).Info("will delete the Device",
-		"Device", name)
-	delURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		efc.CoreMetaClient.Host, efc.CoreMetaClient.Port, DevicePath, name)
+	klog.V(5).Infof("will delete the Device: %s", name)
+	delURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, name)
 	resp, err := efc.R().Delete(delURL)
 	if err != nil {
 		return err
@@ -91,8 +86,7 @@ func (efc *EdgexDeviceClient) Delete(ctx context.Context, name string, options e
 // TODO support to update other fields
 func (efc *EdgexDeviceClient) Update(ctx context.Context, device *devicev1alpha1.Device, options edgeCli.UpdateOptions) (*devicev1alpha1.Device, error) {
 	actualDeviceName := getEdgeDeviceName(device)
-	putURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		efc.CoreMetaClient.Host, efc.CoreMetaClient.Port, DevicePath, actualDeviceName)
+	putURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, actualDeviceName)
 	if device == nil {
 		return nil, nil
 	}
@@ -122,11 +116,9 @@ func (efc *EdgexDeviceClient) Update(ctx context.Context, device *devicev1alpha1
 
 // Get is used to query the device information corresponding to the device name
 func (efc *EdgexDeviceClient) Get(ctx context.Context, deviceName string, options edgeCli.GetOptions) (*devicev1alpha1.Device, error) {
-	efc.V(5).Info("will get Devices",
-		"Device", deviceName)
+	klog.V(5).Infof("will get Devices: %s", deviceName)
 	var device devicev1alpha1.Device
-	getURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		efc.CoreMetaClient.Host, efc.CoreMetaClient.Port, DevicePath, deviceName)
+	getURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, deviceName)
 	resp, err := efc.R().Get(getURL)
 	if err != nil {
 		return &device, err
@@ -143,8 +135,7 @@ func (efc *EdgexDeviceClient) Get(ctx context.Context, deviceName string, option
 // List is used to get all device objects on edge platform
 // The Hanoi version currently supports only a single label and does not support other filters
 func (efc *EdgexDeviceClient) List(ctx context.Context, options edgeCli.ListOptions) ([]devicev1alpha1.Device, error) {
-	lp := fmt.Sprintf("http://%s:%d%s",
-		efc.CoreMetaClient.Host, efc.CoreMetaClient.Port, DevicePath)
+	lp := fmt.Sprintf("http://%s%s", efc.CoreMetaAddr, DevicePath)
 	if options.LabelSelector != nil {
 		if _, ok := options.LabelSelector["label"]; ok {
 			lp = strings.Join([]string{lp, strings.Join([]string{"label", options.LabelSelector["label"]}, "/")}, "/")
@@ -236,7 +227,7 @@ func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyN
 		dps.PutURL = putURL
 	}
 	// set the device property to desired state
-	efc.V(5).Info("setting the property to desired value", "property", dps.Name)
+	klog.V(5).Infof("setting the property %s to desired value", dps.Name)
 	rep, err := resty.New().R().
 		SetHeader("Content-Type", "application/json").
 		SetBody([]byte(fmt.Sprintf(`{"%s": "%s"}`, dps.Name, dps.DesiredValue))).
@@ -289,7 +280,7 @@ func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *d
 		} else {
 			var event models.Event
 			if err := json.Unmarshal(resp.Body(), &event); err != nil {
-				efc.V(5).Error(err, "failed to decode the response ", "response", resp)
+				klog.V(5).ErrorS(err, "failed to decode the response ", "response", resp)
 				continue
 			}
 			actualValue := getPropertyValueFromEvent(c.Name, event)
@@ -322,12 +313,10 @@ func getPropertyValueFromEvent(propertyName string, modelEvent models.Event) str
 // GetCommandResponseByName gets all commands supported by the device
 func (efc *EdgexDeviceClient) GetCommandResponseByName(deviceName string) (
 	models.CommandResponse, error) {
-	efc.V(5).Info("will get CommandResponses",
-		"CommandResponse", deviceName)
+	klog.V(5).Infof("will get CommandResponses of device: %s", deviceName)
 
 	var vd models.CommandResponse
-	getURL := fmt.Sprintf("http://%s:%d%s/name/%s",
-		efc.CoreCommandClient.Host, efc.CoreCommandClient.Port, CommandResponsePath, deviceName)
+	getURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreCommandAddr, CommandResponsePath, deviceName)
 
 	resp, err := efc.R().Get(getURL)
 	if err != nil {

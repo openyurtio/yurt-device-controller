@@ -23,22 +23,22 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/go-logr/logr"
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	clis "github.com/openyurtio/device-controller/clients"
 	devcli "github.com/openyurtio/device-controller/clients"
 	edgexclis "github.com/openyurtio/device-controller/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
 	"github.com/openyurtio/device-controller/controllers/util"
 )
 
 // DeviceProfileReconciler reconciles a DeviceProfile object
 type DeviceProfileReconciler struct {
 	client.Client
-	Log        logr.Logger
 	Scheme     *runtime.Scheme
 	edgeClient devcli.DeviceProfileInterface
 	NodePool   string
@@ -50,7 +50,6 @@ type DeviceProfileReconciler struct {
 
 // Reconcile make changes to a deviceprofile object in EdgeX based on it in Kubernetes
 func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("deviceprofile", req.NamespacedName)
 	var curdp devicev1alpha1.DeviceProfile
 	if err := r.Get(ctx, req.NamespacedName, &curdp); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -59,6 +58,7 @@ func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
+	klog.V(3).Infof("Reconciling the DeviceProfile: %s", curdp.GetName())
 	dpActualName := util.GetEdgeDeviceProfileName(&curdp, EdgeXObjectName)
 	var prevdp *devicev1alpha1.DeviceProfile
 	var exist bool
@@ -76,7 +76,7 @@ func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if err := r.edgeClient.Delete(context.Background(), dpActualName, devcli.DeleteOptions{}); err != nil {
 				return ctrl.Result{}, fmt.Errorf("Fail to delete DeviceProfile on Edgex: %v", err)
 			}
-			log.Info("Successfully delete DeviceProfile on EdgeX", "DeviceProfile", dpActualName)
+			klog.V(2).Infof("Successfully delete DeviceProfile on edge platform: %s", dpActualName)
 		}
 		controllerutil.RemoveFinalizer(&curdp, "devicecontroller.openyurt.io")
 		err := r.Update(context.TODO(), &curdp)
@@ -98,39 +98,25 @@ func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("Fail to add DeviceProfile to Edgex: %v", err)
 		}
-		log.Info("Successfully add DeviceProfile to EdgeX",
-			"DeviceProfile", curdp.GetName(), "EdgeId", curdp.Status.EdgeId)
+		klog.V(2).Infof("Successfully add DeviceProfile to edge platform, Name: %s, EdgeId: %s", curdp.GetName(), curdp.Status.EdgeId)
 		return ctrl.Result{}, r.Status().Update(ctx, curdp)
 	}
 	curdp.Spec.NodePool = ""
 	if !reflect.DeepEqual(curdp.Spec, prevdp.Spec) {
 		// TODO
-		log.Info("controller doesn't support update deviceprofile from Kubernetes to EdgeX")
+		klog.V(2).Info("controller doesn't support update deviceprofile from Kubernetes to edge platform")
 		return ctrl.Result{}, nil
 	}
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *DeviceProfileReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.edgeClient = edgexclis.NewEdgexDeviceProfile(
-		"edgex-core-metadata", 48081, r.Log)
-	nodePool, err := util.GetNodePool(mgr.GetConfig())
-	if err != nil {
-		return err
-	}
-	r.NodePool = nodePool
-
-	// register the filter field for deviceprofile
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &devicev1alpha1.DeviceProfile{}, "spec.nodePool", func(rawObj client.Object) []string {
-		profile := rawObj.(*devicev1alpha1.DeviceProfile)
-		return []string{profile.Spec.NodePool}
-	}); err != nil {
-		return err
-	}
+func (r *DeviceProfileReconciler) SetupWithManager(mgr ctrl.Manager, opts *options.YurtDeviceControllerOptions) error {
+	r.edgeClient = edgexclis.NewEdgexDeviceProfile(opts.CoreMetadataAddr)
+	r.NodePool = opts.Nodepool
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&devicev1alpha1.DeviceProfile{}).
-		WithEventFilter(genFirstUpdateFilter("deviceprofile", r.Log)).
+		WithEventFilter(genFirstUpdateFilter("deviceprofile")).
 		Complete(r)
 }

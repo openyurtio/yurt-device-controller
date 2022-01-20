@@ -22,26 +22,26 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-logr/logr"
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
-	clis "github.com/openyurtio/device-controller/clients"
-	iotcli "github.com/openyurtio/device-controller/clients"
-	edgexCli "github.com/openyurtio/device-controller/clients/edgex-foundry"
-	"github.com/openyurtio/device-controller/controllers/util"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
+	clis "github.com/openyurtio/device-controller/clients"
+	iotcli "github.com/openyurtio/device-controller/clients"
+	edgexCli "github.com/openyurtio/device-controller/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
+	"github.com/openyurtio/device-controller/controllers/util"
 )
 
 // DeviceReconciler reconciles a Device object
 type DeviceReconciler struct {
 	client.Client
-	Log       logr.Logger
 	Scheme    *runtime.Scheme
 	deviceCli iotcli.DeviceInterface
 	// which nodePool deviceController is deployed in
@@ -53,7 +53,6 @@ type DeviceReconciler struct {
 //+kubebuilder:rbac:groups=device.openyurt.io,resources=devices/finalizers,verbs=update
 
 func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("device", req.NamespacedName)
 	var d devicev1alpha1.Device
 	if err := r.Get(ctx, req.NamespacedName, &d); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -64,7 +63,7 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	log.V(4).Info("Reconciling the Device object", "Device", d.GetName())
+	klog.V(3).Infof("Reconciling the Device: %s", d.GetName())
 	// Update the conditions for device
 	defer func() {
 		if d.Spec.Managed != true {
@@ -76,13 +75,13 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		err := r.Status().Update(ctx, &d)
 		if client.IgnoreNotFound(err) != nil {
 			if !apierrors.IsConflict(err) {
-				log.V(4).Error(err, "update device conditions failed", "device", d.GetName())
+				klog.V(4).ErrorS(err, "update device conditions failed", "DeviceName", d.GetName())
 			}
 		}
 	}()
 
 	// 1. Handle the device deletion event
-	if err := r.reconcileDeleteDevice(ctx, &d, log); err != nil {
+	if err := r.reconcileDeleteDevice(ctx, &d); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	} else if !d.ObjectMeta.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
@@ -90,7 +89,7 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if d.Status.Synced == false {
 		// 2. Synchronize OpenYurt device objects to edge platform
-		if err := r.reconcileCreateDevice(ctx, &d, log); err != nil {
+		if err := r.reconcileCreateDevice(ctx, &d); err != nil {
 			if apierrors.IsConflict(err) {
 				return ctrl.Result{Requeue: true}, nil
 			} else {
@@ -100,7 +99,7 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	} else if d.Spec.Managed == true {
 		// 3. If the device has been synchronized and is managed by the cloud, reconcile the device properties
-		if err := r.reconcileUpdateDevice(ctx, &d, log); err != nil {
+		if err := r.reconcileUpdateDevice(ctx, &d); err != nil {
 			if apierrors.IsConflict(err) {
 				return ctrl.Result{RequeueAfter: time.Second * 2}, nil
 			}
@@ -111,32 +110,17 @@ func (r *DeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	coreMetaCliInfo := edgexCli.ClientURL{Host: "edgex-core-metadata", Port: 48081}
-	coreCmdCliInfo := edgexCli.ClientURL{Host: "edgex-core-command", Port: 48082}
-	r.deviceCli = edgexCli.NewEdgexDeviceClient(coreMetaCliInfo, coreCmdCliInfo, r.Log)
+func (r *DeviceReconciler) SetupWithManager(mgr ctrl.Manager, opts *options.YurtDeviceControllerOptions) error {
+	r.deviceCli = edgexCli.NewEdgexDeviceClient(opts.CoreMetadataAddr, opts.CoreCommandAddr)
+	r.NodePool = opts.Nodepool
 
-	// Gets the nodePool to which deviceController is deployed
-	nodePool, err := util.GetNodePool(mgr.GetConfig())
-	if err != nil {
-		return err
-	}
-	r.NodePool = nodePool
-
-	// register the filter field for device
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &devicev1alpha1.Device{}, "spec.nodePool", func(rawObj client.Object) []string {
-		device := rawObj.(*devicev1alpha1.Device)
-		return []string{device.Spec.NodePool}
-	}); err != nil {
-		return err
-	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&devicev1alpha1.Device{}).
-		WithEventFilter(genFirstUpdateFilter("device", r.Log)).
+		WithEventFilter(genFirstUpdateFilter("device")).
 		Complete(r)
 }
 
-func (r *DeviceReconciler) reconcileDeleteDevice(ctx context.Context, d *devicev1alpha1.Device, log logr.Logger) error {
+func (r *DeviceReconciler) reconcileDeleteDevice(ctx context.Context, d *devicev1alpha1.Device) error {
 	// gets the actual name of the device on the Edge platform from the Label of the device
 	edgeDeviceName := util.GetEdgeDeviceName(d, EdgeXObjectName)
 	if d.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -170,33 +154,32 @@ func (r *DeviceReconciler) reconcileDeleteDevice(ctx context.Context, d *devicev
 	return nil
 }
 
-func (r *DeviceReconciler) reconcileCreateDevice(ctx context.Context, d *devicev1alpha1.Device, log logr.Logger) error {
+func (r *DeviceReconciler) reconcileCreateDevice(ctx context.Context, d *devicev1alpha1.Device) error {
 	// get the actual name of the device on the Edge platform from the Label of the device
 	edgeDeviceName := util.GetEdgeDeviceName(d, EdgeXObjectName)
 	newDeviceStatus := d.Status.DeepCopy()
-	log.V(4).Info("Checking if device already exist on the edge platform", "device", d.GetName())
+	klog.V(4).Infof("Checking if device already exist on the edge platform: %s", d.GetName())
 	// Checking if device already exist on the edge platform
 	edgeDevice, err := r.deviceCli.Get(nil, edgeDeviceName, iotcli.GetOptions{})
 	if err == nil {
 		// a. If object exists, the status of the device on OpenYurt is updated
-		log.V(4).Info("Device already exists on edge platform")
+		klog.V(4).Infof("Device already exists on edge platform: %s", d.GetName())
 		newDeviceStatus.EdgeId = edgeDevice.Status.EdgeId
 		newDeviceStatus.Synced = true
 	} else if clis.IsNotFoundErr(err) {
 		// b. If the object does not exist, a request is sent to the edge platform to create a new device
-		log.V(4).Info("Adding device to the edge platform", "device", d.GetName())
+		klog.V(4).Infof("Adding device to the edge platform: %s", d.GetName())
 		createdEdgeObj, err := r.deviceCli.Create(nil, d, iotcli.CreateOptions{})
 		if err != nil {
 			conditions.MarkFalse(d, devicev1alpha1.DeviceSyncedCondition, "failed to create device on edge platform", clusterv1.ConditionSeverityWarning, err.Error())
 			return fmt.Errorf("fail to add Device to edge platform: %v", err)
 		} else {
-			log.V(4).Info("Successfully add Device to edge platform",
-				"EdgeDeviceName", edgeDeviceName, "EdgeId", createdEdgeObj.Status.EdgeId)
+			klog.V(4).Infof("Successfully add Device to edge platform, Name: %s, EdgeId: %s", edgeDeviceName, createdEdgeObj.Status.EdgeId)
 			newDeviceStatus.EdgeId = createdEdgeObj.Status.EdgeId
 			newDeviceStatus.Synced = true
 		}
 	} else {
-		log.V(4).Info("failed to visit the edge platform")
+		klog.V(4).ErrorS(err, "failed to visit the edge platform")
 		conditions.MarkFalse(d, devicev1alpha1.DeviceSyncedCondition, "failed to visit the EdgeX core-metadata-service", clusterv1.ConditionSeverityWarning, "")
 		return nil
 	}
@@ -205,14 +188,14 @@ func (r *DeviceReconciler) reconcileCreateDevice(ctx context.Context, d *devicev
 	return r.Status().Update(ctx, d)
 }
 
-func (r *DeviceReconciler) reconcileUpdateDevice(ctx context.Context, d *devicev1alpha1.Device, log logr.Logger) error {
+func (r *DeviceReconciler) reconcileUpdateDevice(ctx context.Context, d *devicev1alpha1.Device) error {
 	// the device has been added to the edge platform, check if each device property are in the desired state
 	newDeviceStatus := d.Status.DeepCopy()
 	// This list is used to hold the names of properties that failed to reconcile
 	var failedPropertyNames []string
 
 	// 1. reconciling the AdminState and OperatingState field of device
-	log.V(3).Info("reconciling the AdminState and OperatingState field of device")
+	klog.V(3).Infof("DeviceName: %s, reconciling the AdminState and OperatingState field of device", d.GetName())
 	updateDevice := d.DeepCopy()
 	if d.Spec.AdminState != "" && d.Spec.AdminState != d.Status.AdminState {
 		newDeviceStatus.AdminState = d.Spec.AdminState
@@ -232,16 +215,16 @@ func (r *DeviceReconciler) reconcileUpdateDevice(ctx context.Context, d *devicev
 	}
 
 	// 2. reconciling the device properties' value
-	log.V(3).Info("reconciling the device properties")
+	klog.V(3).Infof("DeviceName: %s, reconciling the device properties", d.GetName())
 	// property updates are made only when the device is operational and unlocked
 	if newDeviceStatus.OperatingState == devicev1alpha1.Enabled && newDeviceStatus.AdminState == devicev1alpha1.UnLocked {
-		newDeviceStatus, failedPropertyNames = r.reconcileDeviceProperties(d, newDeviceStatus, log)
+		newDeviceStatus, failedPropertyNames = r.reconcileDeviceProperties(d, newDeviceStatus)
 	}
 
 	d.Status = *newDeviceStatus
 
 	// 3. update the device status on OpenYurt
-	log.V(3).Info("update the device status")
+	klog.V(3).Infof("DeviceName: %s, update the device status", d.GetName())
 	if err := r.Status().Update(ctx, d); err != nil {
 		conditions.MarkFalse(d, devicev1alpha1.DeviceManagingCondition, "failed to update status of device on openyurt", clusterv1.ConditionSeverityWarning, err.Error())
 		return err
@@ -256,28 +239,26 @@ func (r *DeviceReconciler) reconcileUpdateDevice(ctx context.Context, d *devicev
 
 // Update the actual property value of the device on edge platform,
 // return the latest status and the names of the property that failed to update
-func (r *DeviceReconciler) reconcileDeviceProperties(d *devicev1alpha1.Device, deviceStatus *devicev1alpha1.DeviceStatus, log logr.Logger) (*devicev1alpha1.DeviceStatus, []string) {
+func (r *DeviceReconciler) reconcileDeviceProperties(d *devicev1alpha1.Device, deviceStatus *devicev1alpha1.DeviceStatus) (*devicev1alpha1.DeviceStatus, []string) {
 	newDeviceStatus := deviceStatus.DeepCopy()
 	// This list is used to hold the names of properties that failed to reconcile
 	var failedPropertyNames []string
 	// 2. reconciling the device properties' value
-	log.V(3).Info("reconciling the device properties' value")
+	klog.V(3).Infof("DeviceName: %s, reconciling the value of device properties", d.GetName())
 	for _, desiredProperty := range d.Spec.DeviceProperties {
 		if desiredProperty.DesiredValue == "" {
 			continue
 		}
 		propertyName := desiredProperty.Name
 		// 1.1. gets the actual property value of the current device from edge platform
-		log.V(4).Info("getting the actual property state", "property", propertyName)
+		klog.V(4).Infof("DeviceName: %s, getting the actual value of property: %s", d.GetName(), propertyName)
 		actualProperty, err := r.deviceCli.GetPropertyState(nil, propertyName, d, iotcli.GetOptions{})
 		if err != nil {
 			failedPropertyNames = append(failedPropertyNames, propertyName)
 			continue
 		}
-		log.V(4).Info("got the actual property state",
-			"property name", propertyName,
-			"property getURL", actualProperty.GetURL,
-			"property actual value", actualProperty.ActualValue)
+		klog.V(4).Infof("DeviceName: %s, got the actual property state, {Name: %s, GetURL: %s, ActualValue: %s}",
+			d.GetName(), propertyName, actualProperty.GetURL, actualProperty.ActualValue)
 
 		if newDeviceStatus.DeviceProperties == nil {
 			newDeviceStatus.DeviceProperties = map[string]devicev1alpha1.ActualPropertyState{}
@@ -286,16 +267,15 @@ func (r *DeviceReconciler) reconcileDeviceProperties(d *devicev1alpha1.Device, d
 
 		// 1.2. set the device attribute in the edge platform to the expected value
 		if desiredProperty.DesiredValue != actualProperty.ActualValue {
-			log.V(4).Info("the desired value and the actual value are different",
-				"desired value", desiredProperty.DesiredValue,
-				"actual value", actualProperty.ActualValue)
+			klog.V(4).Infof("DeviceName: %s, the desired value and the actual value are different, desired: %s, actual: %s",
+				d.GetName(), desiredProperty.DesiredValue, actualProperty.ActualValue)
 			if err := r.deviceCli.UpdatePropertyState(nil, propertyName, d, iotcli.UpdateOptions{}); err != nil {
-				log.V(4).Error(err, "failed to update property", "propertyName", propertyName)
+				klog.V(4).ErrorS(err, "failed to update property", "DeviceName", d.GetName(), "propertyName", propertyName)
 				failedPropertyNames = append(failedPropertyNames, propertyName)
 				continue
 			}
 
-			log.V(4).Info("successfully set the property to desired value", "property", propertyName)
+			klog.V(4).Infof("DeviceName: %s, successfully set the property %s to desired value", d.GetName(), propertyName)
 			newActualProperty := devicev1alpha1.ActualPropertyState{
 				Name:        propertyName,
 				GetURL:      actualProperty.GetURL,

@@ -21,14 +21,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	iotcli "github.com/openyurtio/device-controller/clients"
 	edgexCli "github.com/openyurtio/device-controller/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
 	"github.com/openyurtio/device-controller/controllers/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlmgr "sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -39,26 +39,17 @@ type DeviceServiceSyncer struct {
 	// syncing period in seconds
 	syncPeriod       time.Duration
 	deviceServiceCli iotcli.DeviceServiceInterface
-	log              logr.Logger
 	NodePool         string
+	Namespace        string
 }
 
-func NewDeviceServiceSyncer(client client.Client,
-	logr logr.Logger,
-	periodSecs uint32, cfg *rest.Config) (DeviceServiceSyncer, error) {
-	log := logr.WithName("syncer").WithName("DeviceService")
-	coreMetaCliInfo := edgexCli.ClientURL{Host: "edgex-core-metadata", Port: 48081}
-
-	nodePool, err := util.GetNodePool(cfg)
-	if err != nil {
-		return DeviceServiceSyncer{}, err
-	}
+func NewDeviceServiceSyncer(client client.Client, opts *options.YurtDeviceControllerOptions) (DeviceServiceSyncer, error) {
 	return DeviceServiceSyncer{
-		syncPeriod:       time.Duration(periodSecs) * time.Second,
-		deviceServiceCli: edgexCli.NewEdgexDeviceServiceClient(coreMetaCliInfo, logr),
+		syncPeriod:       time.Duration(opts.EdgeSyncPeriod) * time.Second,
+		deviceServiceCli: edgexCli.NewEdgexDeviceServiceClient(opts.CoreMetadataAddr),
 		Client:           client,
-		log:              log,
-		NodePool:         nodePool,
+		NodePool:         opts.Nodepool,
+		Namespace:        opts.Namespace,
 	}, nil
 }
 
@@ -70,49 +61,49 @@ func (ds *DeviceServiceSyncer) NewDeviceServiceSyncerRunnable() ctrlmgr.Runnable
 }
 
 func (ds *DeviceServiceSyncer) Run(stop <-chan struct{}) {
-	ds.log.V(1).Info("starting the DeviceServiceSyncer...")
+	klog.V(1).Info("[DeviceService] Starting the syncer...")
 	go func() {
 		for {
 			<-time.After(ds.syncPeriod)
+			klog.V(2).Info("[DeviceService] Start a round of synchronization.")
 			// 1. get deviceServices on edge platform and OpenYurt
 			edgeDeviceServices, kubeDeviceServices, err := ds.getAllDeviceServices()
 			if err != nil {
-				ds.log.V(3).Error(err, "fail to list the deviceServices")
+				klog.V(3).ErrorS(err, "fail to list the deviceServices")
 				continue
 			}
 
 			// 2. find the deviceServices that need to be synchronized
 			redundantEdgeDeviceServices, redundantKubeDeviceServices, syncedDeviceServices :=
 				ds.findDiffDeviceServices(edgeDeviceServices, kubeDeviceServices)
-			ds.log.V(1).Info("The number of deviceServices waiting for synchronization",
+			klog.V(2).Infof("[DeviceService] The number of objects waiting for synchronization { %s:%d, %s:%d, %s:%d }",
 				"Edge deviceServices should be added to OpenYurt", len(redundantEdgeDeviceServices),
 				"OpenYurt deviceServices that should be deleted", len(redundantKubeDeviceServices),
 				"DeviceServices that should be synchronized", len(syncedDeviceServices))
 
 			// 3. create deviceServices on OpenYurt which are exists in edge platform but not in OpenYurt
 			if err := ds.syncEdgeToKube(redundantEdgeDeviceServices); err != nil {
-				ds.log.V(3).Error(err, "fail to create deviceServices on OpenYurt")
+				klog.V(3).ErrorS(err, "fail to create deviceServices on OpenYurt")
 				continue
 			}
 
 			// 4. delete redundant deviceServices on OpenYurt
 			if err := ds.deleteDeviceServices(redundantKubeDeviceServices); err != nil {
-				ds.log.V(3).Error(err, "fail to delete redundant deviceServices on OpenYurt")
+				klog.V(3).ErrorS(err, "fail to delete redundant deviceServices on OpenYurt")
 				continue
 			}
 
 			// 5. update deviceService status on OpenYurt
 			if err := ds.updateDeviceServices(syncedDeviceServices); err != nil {
-				ds.log.Error(err, "fail to update deviceServices")
+				klog.V(3).ErrorS(err, "fail to update deviceServices")
 				continue
 			}
-
-			ds.log.V(1).Info("One round of DeviceService synchronization is complete")
+			klog.V(2).Info("[DeviceService] One round of synchronization is complete")
 		}
 	}()
 
 	<-stop
-	ds.log.V(1).Info("stopping the deviceService syncer")
+	klog.V(1).Info("[DeviceService] Stopping the syncer")
 }
 
 // Get the existing DeviceService on the Edge platform, as well as OpenYurt existing DeviceService
@@ -127,14 +118,14 @@ func (ds *DeviceServiceSyncer) getAllDeviceServices() (
 	// 1. list deviceServices on edge platform
 	eDevSs, err := ds.deviceServiceCli.List(nil, iotcli.ListOptions{})
 	if err != nil {
-		ds.log.V(4).Error(err, "fail to list the deviceServices object on the edge platform")
+		klog.V(4).ErrorS(err, "fail to list the deviceServices object on the edge platform")
 		return edgeDeviceServices, kubeDeviceServices, err
 	}
 	// 2. list deviceServices on OpenYurt (filter objects belonging to edgeServer)
 	var kDevSs devicev1alpha1.DeviceServiceList
 	listOptions := client.MatchingFields{"spec.nodePool": ds.NodePool}
-	if err = ds.List(context.TODO(), &kDevSs, listOptions); err != nil {
-		ds.log.V(4).Error(err, "fail to list the deviceServices object on the Kubernetes")
+	if err = ds.List(context.TODO(), &kDevSs, listOptions, client.InNamespace(ds.Namespace)); err != nil {
+		klog.V(4).ErrorS(err, "fail to list the deviceServices object on the Kubernetes")
 		return edgeDeviceServices, kubeDeviceServices, err
 	}
 	for i := range eDevSs {
@@ -190,12 +181,11 @@ func (ds *DeviceServiceSyncer) syncEdgeToKube(edgeDevs map[string]*devicev1alpha
 	for _, ed := range edgeDevs {
 		if err := ds.Client.Create(context.TODO(), ed); err != nil {
 			if apierrors.IsAlreadyExists(err) {
-				ds.log.V(5).Info("DeviceService already exist on Kubernetes",
+				klog.V(5).InfoS("DeviceService already exist on Kubernetes",
 					"DeviceService", strings.ToLower(ed.Name))
 				continue
 			}
-			ds.log.Info("created deviceService failed:",
-				"DeviceService", strings.ToLower(ed.Name))
+			klog.InfoS("created deviceService failed:", "DeviceService", strings.ToLower(ed.Name))
 			return err
 		}
 	}
@@ -206,7 +196,7 @@ func (ds *DeviceServiceSyncer) syncEdgeToKube(edgeDevs map[string]*devicev1alpha
 func (ds *DeviceServiceSyncer) deleteDeviceServices(redundantKubeDeviceServices map[string]*devicev1alpha1.DeviceService) error {
 	for i := range redundantKubeDeviceServices {
 		if err := ds.Client.Delete(context.TODO(), redundantKubeDeviceServices[i]); err != nil {
-			ds.log.V(5).Error(err, "fail to delete the DeviceService on Kubernetes",
+			klog.V(5).ErrorS(err, "fail to delete the DeviceService on Kubernetes",
 				"DeviceService", redundantKubeDeviceServices[i].Name)
 			return err
 		}
@@ -222,11 +212,10 @@ func (ds *DeviceServiceSyncer) updateDeviceServices(syncedDeviceServices map[str
 		}
 		if err := ds.Client.Status().Update(context.TODO(), sd); err != nil {
 			if apierrors.IsConflict(err) {
-				ds.log.V(5).Info("update Conflicts",
-					"DeviceService", sd.Name)
+				klog.V(5).InfoS("update Conflicts", "DeviceService", sd.Name)
 				continue
 			}
-			ds.log.V(5).Error(err, "fail to update the DeviceService on Kubernetes",
+			klog.V(5).ErrorS(err, "fail to update the DeviceService on Kubernetes",
 				"DeviceService", sd.Name)
 			return err
 		}
@@ -238,6 +227,7 @@ func (ds *DeviceServiceSyncer) updateDeviceServices(syncedDeviceServices map[str
 func (ds *DeviceServiceSyncer) completeCreateContent(edgeDS *devicev1alpha1.DeviceService) *devicev1alpha1.DeviceService {
 	createDevice := edgeDS.DeepCopy()
 	createDevice.Spec.NodePool = ds.NodePool
+	createDevice.Namespace = ds.Namespace
 	createDevice.Name = strings.Join([]string{ds.NodePool, createDevice.Name}, "-")
 	createDevice.Spec.Managed = false
 	return createDevice

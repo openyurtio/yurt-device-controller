@@ -20,9 +20,9 @@ import (
 	"strings"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 )
 
 const (
