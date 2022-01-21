@@ -142,34 +142,31 @@ func (ds *DeviceSyncer) getAllDevices() (map[string]devicev1alpha1.Device, map[s
 
 // Get the list of devices that need to be added, deleted and updated
 func (ds *DeviceSyncer) findDiffDevice(
-	edgeDevice map[string]devicev1alpha1.Device, kubeDevice map[string]devicev1alpha1.Device) (
+	edgeDevices map[string]devicev1alpha1.Device, kubeDevices map[string]devicev1alpha1.Device) (
 	redundantEdgeDevices map[string]*devicev1alpha1.Device, redundantKubeDevices map[string]*devicev1alpha1.Device, syncedDevices map[string]*devicev1alpha1.Device) {
 
 	redundantEdgeDevices = map[string]*devicev1alpha1.Device{}
 	redundantKubeDevices = map[string]*devicev1alpha1.Device{}
 	syncedDevices = map[string]*devicev1alpha1.Device{}
 
-	for n := range edgeDevice {
-		tmp := edgeDevice[n]
-		edName := util.GetEdgeDeviceName(&tmp, EdgeXObjectName)
-		if _, exists := kubeDevice[edName]; !exists {
-			ed := edgeDevice[n]
+	for i := range edgeDevices {
+		ed := edgeDevices[i]
+		edName := util.GetEdgeDeviceName(&ed, EdgeXObjectName)
+		if _, exists := kubeDevices[edName]; !exists {
 			redundantEdgeDevices[edName] = ds.completeCreateContent(&ed)
 		} else {
-			kd := kubeDevice[edName]
-			ed := edgeDevice[edName]
+			kd := kubeDevices[edName]
 			syncedDevices[edName] = ds.completeUpdateContent(&kd, &ed)
 		}
 	}
 
-	for n, v := range kubeDevice {
-		if !v.Status.Synced {
+	for i := range kubeDevices {
+		kd := kubeDevices[i]
+		if !kd.Status.Synced {
 			continue
 		}
-		tmp := kubeDevice[n]
-		kdName := util.GetEdgeDeviceName(&tmp, EdgeXObjectName)
-		if _, exists := edgeDevice[kdName]; !exists {
-			kd := kubeDevice[n]
+		kdName := util.GetEdgeDeviceName(&kd, EdgeXObjectName)
+		if _, exists := edgeDevices[kdName]; !exists {
 			redundantKubeDevices[kdName] = &kd
 		}
 	}
@@ -192,10 +189,10 @@ func (ds *DeviceSyncer) syncEdgeToKube(edgeDevs map[string]*devicev1alpha1.Devic
 
 // deleteDevices deletes redundant device on OpenYurt
 func (ds *DeviceSyncer) deleteDevices(redundantKubeDevices map[string]*devicev1alpha1.Device) error {
-	for i := range redundantKubeDevices {
-		if err := ds.Client.Delete(context.TODO(), redundantKubeDevices[i]); err != nil {
+	for _, kd := range redundantKubeDevices {
+		if err := ds.Client.Delete(context.TODO(), kd); err != nil {
 			klog.V(5).ErrorS(err, "fail to delete the device on OpenYurt",
-				"DeviceName", redundantKubeDevices[i].Name)
+				"DeviceName", kd.Name)
 			return err
 		}
 	}

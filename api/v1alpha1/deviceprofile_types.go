@@ -20,6 +20,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	DeviceProfileFinalizer = "v1alpha1.deviceProfile.finalizer"
+)
+
 type DeviceResource struct {
 	Description string            `json:"description"`
 	Name        string            `json:"name"`
