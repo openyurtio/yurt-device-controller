@@ -149,28 +149,25 @@ func (ds *DeviceServiceSyncer) findDiffDeviceServices(
 	redundantKubeDeviceServices = map[string]*devicev1alpha1.DeviceService{}
 	syncedDeviceServices = map[string]*devicev1alpha1.DeviceService{}
 
-	for n := range edgeDeviceService {
-		eds := edgeDeviceService[n]
+	for i := range edgeDeviceService {
+		eds := edgeDeviceService[i]
 		edName := util.GetEdgeDeviceServiceName(&eds, EdgeXObjectName)
 		if _, exists := kubeDeviceService[edName]; !exists {
-			ed := edgeDeviceService[n]
-			redundantEdgeDeviceServices[edName] = ds.completeCreateContent(&ed)
+			redundantEdgeDeviceServices[edName] = ds.completeCreateContent(&eds)
 		} else {
 			kd := kubeDeviceService[edName]
-			ed := edgeDeviceService[n]
-			syncedDeviceServices[edName] = ds.completeUpdateContent(&kd, &ed)
+			syncedDeviceServices[edName] = ds.completeUpdateContent(&kd, &eds)
 		}
 	}
 
-	for k, v := range kubeDeviceService {
-		if !v.Status.Synced {
+	for i := range kubeDeviceService {
+		kds := kubeDeviceService[i]
+		if !kds.Status.Synced {
 			continue
 		}
-		kds := kubeDeviceService[k]
 		kdName := util.GetEdgeDeviceServiceName(&kds, EdgeXObjectName)
 		if _, exists := edgeDeviceService[kdName]; !exists {
-			kd := kubeDeviceService[k]
-			redundantKubeDeviceServices[kdName] = &kd
+			redundantKubeDeviceServices[kdName] = &kds
 		}
 	}
 	return
@@ -194,17 +191,17 @@ func (ds *DeviceServiceSyncer) syncEdgeToKube(edgeDevs map[string]*devicev1alpha
 
 // deleteDeviceServices deletes redundant deviceServices on OpenYurt
 func (ds *DeviceServiceSyncer) deleteDeviceServices(redundantKubeDeviceServices map[string]*devicev1alpha1.DeviceService) error {
-	for i := range redundantKubeDeviceServices {
-		if err := ds.Client.Delete(context.TODO(), redundantKubeDeviceServices[i]); err != nil {
+	for _, kds := range redundantKubeDeviceServices {
+		if err := ds.Client.Delete(context.TODO(), kds); err != nil {
 			klog.V(5).ErrorS(err, "fail to delete the DeviceService on Kubernetes",
-				"DeviceService", redundantKubeDeviceServices[i].Name)
+				"DeviceService", kds.Name)
 			return err
 		}
 	}
 	return nil
 }
 
-// updateDeviceServicesStatus updates deviceServices status on OpenYurt
+// updateDeviceServices updates deviceServices status on OpenYurt
 func (ds *DeviceServiceSyncer) updateDeviceServices(syncedDeviceServices map[string]*devicev1alpha1.DeviceService) error {
 	for _, sd := range syncedDeviceServices {
 		if sd.ObjectMeta.ResourceVersion == "" {

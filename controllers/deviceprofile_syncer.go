@@ -18,8 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -38,7 +36,7 @@ import (
 type DeviceProfileSyncer struct {
 	// syncing period in seconds
 	syncPeriod time.Duration
-	// EdgeX core-data-service's client
+	// edge platform client
 	edgeClient devcli.DeviceProfileInterface
 	// Kubernetes client
 	client.Client
@@ -65,46 +63,42 @@ func (dps *DeviceProfileSyncer) NewDeviceProfileSyncerRunnable() ctrlmgr.Runnabl
 	}
 }
 
-func (ds *DeviceProfileSyncer) Run(stop <-chan struct{}) {
+func (dps *DeviceProfileSyncer) Run(stop <-chan struct{}) {
 	klog.V(1).Info("[DeviceProfile] Starting the syncer...")
 	go func() {
 		for {
-			<-time.After(ds.syncPeriod)
+			<-time.After(dps.syncPeriod)
 			klog.V(2).Info("[DeviceProfile] Start a round of synchronization.")
-			// list devices on edgex foundry
-			eDevs, err := ds.edgeClient.List(context.Background(), devcli.ListOptions{})
+
+			// 1. get deviceProfiles on edge platform and OpenYurt
+			edgeDeviceProfiles, kubeDeviceProfiles, err := dps.getAllDeviceProfiles()
 			if err != nil {
-				klog.V(3).ErrorS(err, "fail to list the deviceprofile object on the edge platform")
+				klog.V(3).ErrorS(err, "fail to list the deviceProfiles")
 				continue
 			}
-			addNodePoolField(eDevs, ds.NodePool)
-			// list devices on Kubernetes
-			var kDevs devicev1alpha1.DeviceProfileList
-			listOptions := client.MatchingFields{"spec.nodePool": ds.NodePool}
-			if err := ds.List(context.TODO(), &kDevs, listOptions, client.InNamespace(ds.Namespace)); err != nil {
-				klog.V(3).ErrorS(err, "fail to list the deviceprofile object on the Kubernetes")
+
+			// 2. find the deviceProfiles that need to be synchronized
+			redundantEdgeDeviceProfiles, redundantKubeDeviceProfiles, syncedDeviceProfiles :=
+				dps.findDiffDeviceProfiles(edgeDeviceProfiles, kubeDeviceProfiles)
+			klog.V(2).Infof("[DeviceProfile] The number of objects waiting for synchronization { %s:%d, %s:%d, %s:%d }",
+				"Edge deviceProfiles should be added to OpenYurt", len(redundantEdgeDeviceProfiles),
+				"OpenYurt deviceProfiles that should be deleted", len(redundantKubeDeviceProfiles),
+				"DeviceProfiles that should be synchronized", len(syncedDeviceProfiles))
+
+			// 3. create deviceProfiles on OpenYurt which are exists in edge platform but not in OpenYurt
+			if err := dps.syncEdgeToKube(redundantEdgeDeviceProfiles); err != nil {
+				klog.V(3).ErrorS(err, "fail to create deviceProfiles on OpenYurt")
 				continue
 			}
-			// create the device profiles on Kubernetes but not on EdgeX
-			newKDevs, updateKDevs := ds.findNewUpdateDeviceProfile(eDevs, kDevs.Items)
-			if len(newKDevs) != 0 {
-				if err := createDeviceProfile(ds.Client, newKDevs, ds.NodePool); err != nil {
-					klog.V(3).ErrorS(err, "fail to create device profiles")
-					continue
-				}
+
+			// 4. delete redundant deviceProfiles on OpenYurt
+			if err := dps.deleteDeviceProfiles(redundantKubeDeviceProfiles); err != nil {
+				klog.V(3).ErrorS(err, "fail to delete redundant deviceProfiles on OpenYurt")
+				continue
 			}
-			// update the device profiles according EdgeX
-			if len(updateKDevs) != 0 {
-				// TODO
-			}
-			// delete the device profiles on Kubernetes but not on Egdex
-			deleteKDevs := findDeleteDeviceProfile(eDevs, kDevs.Items)
-			if len(deleteKDevs) != 0 {
-				if err := deleteDeviceProfile(ds.Client, deleteKDevs); err != nil {
-					klog.V(3).ErrorS(err, "fail to delete device profiles")
-				}
-			}
-			klog.V(2).Info("[DeviceProfile] One round of synchronization is complete")
+
+			// 5. update deviceProfiles on OpenYurt
+			// TODO
 		}
 	}()
 
@@ -112,92 +106,111 @@ func (ds *DeviceProfileSyncer) Run(stop <-chan struct{}) {
 	klog.V(1).Info("[DeviceProfile] Stopping the syncer")
 }
 
-func addNodePoolField(edgeXDevs []devicev1alpha1.DeviceProfile, NodePoolName string) {
-	for i := range edgeXDevs {
-		edgeXDevs[i].Spec.NodePool = NodePoolName
+// Get the existing DeviceProfile on the Edge platform, as well as OpenYurt existing DeviceProfile
+// edgeDeviceProfiles：map[actualName]DeviceProfile
+// kubeDeviceProfiles：map[actualName]DeviceProfile
+func (dps *DeviceProfileSyncer) getAllDeviceProfiles() (
+	map[string]devicev1alpha1.DeviceProfile, map[string]devicev1alpha1.DeviceProfile, error) {
+
+	edgeDeviceProfiles := map[string]devicev1alpha1.DeviceProfile{}
+	kubeDeviceProfiles := map[string]devicev1alpha1.DeviceProfile{}
+
+	// 1. list deviceProfiles on edge platform
+	eDps, err := dps.edgeClient.List(nil, devcli.ListOptions{})
+	if err != nil {
+		klog.V(4).ErrorS(err, "fail to list the deviceProfiles on the edge platform")
+		return edgeDeviceProfiles, kubeDeviceProfiles, err
 	}
+	// 2. list deviceProfiles on OpenYurt (filter objects belonging to edgeServer)
+	var kDps devicev1alpha1.DeviceProfileList
+	listOptions := client.MatchingFields{"spec.nodePool": dps.NodePool}
+	if err = dps.List(context.TODO(), &kDps, listOptions, client.InNamespace(dps.Namespace)); err != nil {
+		klog.V(4).ErrorS(err, "fail to list the deviceProfiles on the Kubernetes")
+		return edgeDeviceProfiles, kubeDeviceProfiles, err
+	}
+	for i := range eDps {
+		deviceProfilesName := util.GetEdgeDeviceProfileName(&eDps[i], EdgeXObjectName)
+		edgeDeviceProfiles[deviceProfilesName] = eDps[i]
+	}
+
+	for i := range kDps.Items {
+		deviceProfilesName := util.GetEdgeDeviceProfileName(&kDps.Items[i], EdgeXObjectName)
+		kubeDeviceProfiles[deviceProfilesName] = kDps.Items[i]
+	}
+	return edgeDeviceProfiles, kubeDeviceProfiles, nil
 }
 
-// findNewUpdateDeviceProfile finds deviceprofiles that have been created on the EdgeX but not the Kubernetes
-func (ds *DeviceProfileSyncer) findNewUpdateDeviceProfile(edgeXDevs, kubeDevs []devicev1alpha1.DeviceProfile) ([]devicev1alpha1.DeviceProfile, []devicev1alpha1.DeviceProfile) {
-	var addDevs, updateDevs []devicev1alpha1.DeviceProfile
-	for _, exd := range edgeXDevs {
-		var exist bool
-		for i, kd := range kubeDevs {
-			dp := kubeDevs[i]
-			if exd.Name == strings.ToLower(util.GetEdgeDeviceProfileName(&dp, EdgeXObjectName)) {
-				exist = true
-				if !reflect.DeepEqual(exd.Spec, kd.Spec) {
-					kd.Spec = exd.Spec
-					updateDevs = append(updateDevs, kd)
-				}
-				break
-			}
-		}
-		if !exist {
-			exd.Namespace = ds.Namespace
-			addDevs = append(addDevs, exd)
+// Get the list of deviceProfiles that need to be added, deleted and updated
+func (dps *DeviceProfileSyncer) findDiffDeviceProfiles(
+	edgeDeviceProfiles map[string]devicev1alpha1.DeviceProfile, kubeDeviceProfiles map[string]devicev1alpha1.DeviceProfile) (
+	redundantEdgeDeviceProfiles map[string]*devicev1alpha1.DeviceProfile, redundantKubeDeviceProfiles map[string]*devicev1alpha1.DeviceProfile, syncedDeviceProfiles map[string]*devicev1alpha1.DeviceProfile) {
+
+	redundantEdgeDeviceProfiles = map[string]*devicev1alpha1.DeviceProfile{}
+	redundantKubeDeviceProfiles = map[string]*devicev1alpha1.DeviceProfile{}
+	syncedDeviceProfiles = map[string]*devicev1alpha1.DeviceProfile{}
+
+	for i := range edgeDeviceProfiles {
+		edp := edgeDeviceProfiles[i]
+		edpName := util.GetEdgeDeviceProfileName(&edp, EdgeXObjectName)
+		if _, exists := kubeDeviceProfiles[edpName]; !exists {
+			redundantEdgeDeviceProfiles[edpName] = dps.completeCreateContent(&edp)
+		} else {
+			kdp := kubeDeviceProfiles[edpName]
+			syncedDeviceProfiles[edpName] = dps.completeUpdateContent(&kdp, &edp)
 		}
 	}
 
-	return addDevs, updateDevs
-}
-
-// findDeleteDeviceProfile finds deviceprofiles that exist on the Kubernetes but not on the EdgeX
-func findDeleteDeviceProfile(edgeXDevs, kubeDevs []devicev1alpha1.DeviceProfile) []devicev1alpha1.DeviceProfile {
-	var deleteDevs []devicev1alpha1.DeviceProfile
-	for _, kd := range kubeDevs {
-		var exist bool
-		for i, exd := range edgeXDevs {
-			dp := edgeXDevs[i]
-			if exd.Name == strings.ToLower(util.GetEdgeDeviceProfileName(&dp, EdgeXObjectName)) {
-				exist = true
-				break
-			}
+	for i := range kubeDeviceProfiles {
+		kdp := kubeDeviceProfiles[i]
+		if !kdp.Status.Synced {
+			continue
 		}
-		if !exist && kd.Status.Synced {
-			deleteDevs = append(deleteDevs, kd)
+		kdpName := util.GetEdgeDeviceProfileName(&kdp, EdgeXObjectName)
+		if _, exists := edgeDeviceProfiles[kdpName]; !exists {
+			redundantKubeDeviceProfiles[kdpName] = &kdp
 		}
 	}
-	return deleteDevs
+	return
 }
 
-func getKubeNameWithPrefix(edgeName, NodePoolName string) string {
-	if NodePoolName == "" {
-		return edgeName
-	}
-	return fmt.Sprintf("%s-%s", NodePoolName, edgeName)
+// completeCreateContent completes the content of the deviceProfile which will be created on OpenYurt
+func (dps *DeviceProfileSyncer) completeCreateContent(edgeDps *devicev1alpha1.DeviceProfile) *devicev1alpha1.DeviceProfile {
+	createDeviceProfile := edgeDps.DeepCopy()
+	createDeviceProfile.Namespace = dps.Namespace
+	createDeviceProfile.Name = strings.Join([]string{dps.NodePool, createDeviceProfile.Name}, "-")
+	createDeviceProfile.Spec.NodePool = dps.NodePool
+	return createDeviceProfile
 }
 
-// createDeviceProfile creates the list of device profiles
-func createDeviceProfile(cli client.Client, edgeXDevs []devicev1alpha1.DeviceProfile, NodePoolName string) error {
-	for _, ed := range edgeXDevs {
-		ed.SetName(getKubeNameWithPrefix(ed.GetName(), NodePoolName))
-		if err := cli.Create(context.TODO(), &ed); err != nil {
+// completeUpdateContent completes the content of the deviceProfile which will be updated on OpenYurt
+// TODO
+func (dps *DeviceProfileSyncer) completeUpdateContent(kubeDps *devicev1alpha1.DeviceProfile, edgeDS *devicev1alpha1.DeviceProfile) *devicev1alpha1.DeviceProfile {
+	return kubeDps
+}
+
+// syncEdgeToKube creates deviceProfiles on OpenYurt which are exists in edge platform but not in OpenYurt
+func (dps *DeviceProfileSyncer) syncEdgeToKube(edgeDps map[string]*devicev1alpha1.DeviceProfile) error {
+	for _, edp := range edgeDps {
+		if err := dps.Client.Create(context.TODO(), edp); err != nil {
 			if apierrors.IsAlreadyExists(err) {
-				klog.V(4).InfoS("DeviceProfile already exist on Kubernetes", "deviceprofile", strings.ToLower(ed.Name))
+				klog.V(5).Infof("DeviceProfile already exist on Kubernetes: %s", strings.ToLower(edp.Name))
 				continue
 			}
+			klog.Infof("created deviceProfile failed: %s", strings.ToLower(edp.Name))
 			return err
 		}
-		if err := cli.Status().Update(context.TODO(), &ed); err != nil {
-			return err
-		}
-		klog.V(4).InfoS("Successfully create DeviceProfile to Kubernetes", "DeviceProfile", ed.GetName())
 	}
 	return nil
 }
 
-func deleteDeviceProfile(cli client.Client, kubeDevs []devicev1alpha1.DeviceProfile) error {
-	for _, kd := range kubeDevs {
-		if err := cli.Delete(context.TODO(), &kd); err != nil {
-			if apierrors.IsNotFound(err) {
-				klog.V(4).InfoS("DeviceProfile doesn't exist on Kubernetes", "deviceprofile", kd.Name)
-				continue
-			}
+// deleteDeviceProfiles deletes redundant deviceProfiles on OpenYurt
+func (dps *DeviceProfileSyncer) deleteDeviceProfiles(redundantKubeDeviceProfiles map[string]*devicev1alpha1.DeviceProfile) error {
+	for _, kdp := range redundantKubeDeviceProfiles {
+		if err := dps.Client.Delete(context.TODO(), kdp); err != nil {
+			klog.V(5).ErrorS(err, "fail to delete the DeviceProfile on Kubernetes: %s ",
+				"DeviceProfile", kdp.Name)
 			return err
 		}
-		klog.V(4).InfoS("Successfully delete DeviceProfile on Kubernetes", "DeviceProfile", kd.GetName())
 	}
 	return nil
 }

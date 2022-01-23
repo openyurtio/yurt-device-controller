@@ -18,15 +18,15 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"reflect"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	clis "github.com/openyurtio/device-controller/clients"
@@ -50,63 +50,38 @@ type DeviceProfileReconciler struct {
 
 // Reconcile make changes to a deviceprofile object in EdgeX based on it in Kubernetes
 func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var curdp devicev1alpha1.DeviceProfile
-	if err := r.Get(ctx, req.NamespacedName, &curdp); err != nil {
+	var dp devicev1alpha1.DeviceProfile
+	if err := r.Get(ctx, req.NamespacedName, &dp); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	if curdp.Spec.NodePool != r.NodePool {
+	if dp.Spec.NodePool != r.NodePool {
+		return ctrl.Result{}, nil
+	}
+	klog.V(3).Infof("Reconciling the DeviceProfile: %s", dp.GetName())
+
+	// gets the actual name of deviceProfile on the edge platform from the Label of the deviceProfile
+	dpActualName := util.GetEdgeDeviceProfileName(&dp, EdgeXObjectName)
+
+	// 1. Handle the deviceProfile deletion event
+	if err := r.reconcileDeleteDeviceProfile(ctx, &dp, dpActualName); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	} else if !dp.ObjectMeta.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
 
-	klog.V(3).Infof("Reconciling the DeviceProfile: %s", curdp.GetName())
-	dpActualName := util.GetEdgeDeviceProfileName(&curdp, EdgeXObjectName)
-	var prevdp *devicev1alpha1.DeviceProfile
-	var exist bool
-	prevdp, err := r.edgeClient.Get(context.Background(), dpActualName, devcli.GetOptions{})
-	if err == nil {
-		exist = true
-	} else if clis.IsNotFoundErr(err) {
-		exist = false
-	} else {
-		return ctrl.Result{}, err
-	}
-
-	if !curdp.ObjectMeta.DeletionTimestamp.IsZero() {
-		if exist {
-			if err := r.edgeClient.Delete(context.Background(), dpActualName, devcli.DeleteOptions{}); err != nil {
-				return ctrl.Result{}, fmt.Errorf("Fail to delete DeviceProfile on Edgex: %v", err)
-			}
-			klog.V(2).Infof("Successfully delete DeviceProfile on edge platform: %s", dpActualName)
-		}
-		controllerutil.RemoveFinalizer(&curdp, "devicecontroller.openyurt.io")
-		err := r.Update(context.TODO(), &curdp)
-
-		return ctrl.Result{}, err
-	}
-
-	if !controllerutil.ContainsFinalizer(&curdp, "devicecontroller.openyurt.io") {
-		controllerutil.AddFinalizer(&curdp, "devicecontroller.openyurt.io")
-		if err = r.Update(context.TODO(), &curdp); err != nil {
+	if dp.Status.Synced == false {
+		// 2. Synchronize OpenYurt deviceProfile to edge platform
+		if err := r.reconcileCreateDeviceProfile(ctx, &dp, dpActualName); err != nil {
 			if apierrors.IsConflict(err) {
 				return ctrl.Result{Requeue: true}, nil
+			} else {
+				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, err
 		}
 	}
-	if !exist {
-		curdp, err := r.edgeClient.Create(context.Background(), &curdp, devcli.CreateOptions{})
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("Fail to add DeviceProfile to Edgex: %v", err)
-		}
-		klog.V(2).Infof("Successfully add DeviceProfile to edge platform, Name: %s, EdgeId: %s", curdp.GetName(), curdp.Status.EdgeId)
-		return ctrl.Result{}, r.Status().Update(ctx, curdp)
-	}
-	curdp.Spec.NodePool = ""
-	if !reflect.DeepEqual(curdp.Spec, prevdp.Spec) {
-		// TODO
-		klog.V(2).Info("controller doesn't support update deviceprofile from Kubernetes to edge platform")
-		return ctrl.Result{}, nil
-	}
+	// 3. Handle the deviceProfile update event
+	// TODO
+
 	return ctrl.Result{}, nil
 }
 
@@ -119,4 +94,71 @@ func (r *DeviceProfileReconciler) SetupWithManager(mgr ctrl.Manager, opts *optio
 		For(&devicev1alpha1.DeviceProfile{}).
 		WithEventFilter(genFirstUpdateFilter("deviceprofile")).
 		Complete(r)
+}
+
+func (r *DeviceProfileReconciler) reconcileDeleteDeviceProfile(ctx context.Context, dp *devicev1alpha1.DeviceProfile, actualName string) error {
+	if dp.ObjectMeta.DeletionTimestamp.IsZero() {
+		if len(dp.GetFinalizers()) == 0 {
+			patchString := map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"finalizers": []string{devicev1alpha1.DeviceProfileFinalizer},
+				},
+			}
+			if patchData, err := json.Marshal(patchString); err != nil {
+				return err
+			} else {
+				if err = r.Patch(ctx, dp, client.RawPatch(types.MergePatchType, patchData)); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		patchString := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"finalizers": []string{},
+			},
+		}
+		// delete the deviceProfile in OpenYurt
+		if patchData, err := json.Marshal(patchString); err != nil {
+			return err
+		} else {
+			if err = r.Patch(ctx, dp, client.RawPatch(types.MergePatchType, patchData)); err != nil {
+				return err
+			}
+		}
+
+		// delete the deviceProfile object on edge platform
+		err := r.edgeClient.Delete(nil, actualName, devcli.DeleteOptions{})
+		if err != nil && !clis.IsNotFoundErr(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *DeviceProfileReconciler) reconcileCreateDeviceProfile(ctx context.Context, dp *devicev1alpha1.DeviceProfile, actualName string) error {
+	klog.V(4).Infof("Checking if deviceProfile already exist on the edge platform: %s", dp.GetName())
+	if edgeDp, err := r.edgeClient.Get(nil, actualName, devcli.GetOptions{}); err != nil {
+		if !clis.IsNotFoundErr(err) {
+			klog.V(4).ErrorS(err, "fail to visit the edge platform")
+			return nil
+		}
+	} else {
+		// a. If object exists, the status of the deviceProfile on OpenYurt is updated
+		klog.V(4).Info("DeviceProfile already exists on edge platform")
+		dp.Status.Synced = true
+		dp.Status.EdgeId = edgeDp.Status.EdgeId
+		return r.Status().Update(ctx, dp)
+	}
+
+	// b. If object does not exist, a request is sent to the edge platform to create a new deviceProfile
+	createDp, err := r.edgeClient.Create(context.Background(), dp, devcli.CreateOptions{})
+	if err != nil {
+		klog.V(4).ErrorS(err, "failed to create deviceProfile on edge platform")
+		return fmt.Errorf("failed to add deviceProfile to edge platform: %v", err)
+	}
+	klog.V(3).Infof("Successfully add DeviceProfile to edge platform, Name: %s, EdgeId: %s", createDp.GetName(), createDp.Status.EdgeId)
+	dp.Status.EdgeId = createDp.Status.EdgeId
+	dp.Status.Synced = true
+	return r.Status().Update(ctx, dp)
 }
