@@ -283,7 +283,19 @@ func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *d
 				klog.V(5).ErrorS(err, "failed to decode the response ", "response", resp)
 				continue
 			}
-			actualValue := getPropertyValueFromEvent(c.Name, event)
+			readingName := c.Name
+			getResp := c.Get.Responses
+			for _, it := range getResp {
+				if it.Code == "200" {
+					expectValues := it.ExpectedValues
+					if len(expectValues) == 1 {
+						readingName = expectValues[0]
+					}
+				}
+			}
+			klog.V(5).Infof("get reading name %s for command %s of device %s", readingName, c.Name, device.Name)
+			actualValue := getPropertyValueFromEvent(readingName, event)
+
 			aps[c.Name] = devicev1alpha1.ActualPropertyState{Name: c.Name, GetURL: c.Get.URL, ActualValue: actualValue}
 		}
 	}
