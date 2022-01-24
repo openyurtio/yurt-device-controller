@@ -84,19 +84,16 @@ func (ds *DeviceServiceSyncer) Run(stop <-chan struct{}) {
 			// 3. create deviceServices on OpenYurt which are exists in edge platform but not in OpenYurt
 			if err := ds.syncEdgeToKube(redundantEdgeDeviceServices); err != nil {
 				klog.V(3).ErrorS(err, "fail to create deviceServices on OpenYurt")
-				continue
 			}
 
 			// 4. delete redundant deviceServices on OpenYurt
 			if err := ds.deleteDeviceServices(redundantKubeDeviceServices); err != nil {
 				klog.V(3).ErrorS(err, "fail to delete redundant deviceServices on OpenYurt")
-				continue
 			}
 
 			// 5. update deviceService status on OpenYurt
 			if err := ds.updateDeviceServices(syncedDeviceServices); err != nil {
 				klog.V(3).ErrorS(err, "fail to update deviceServices")
-				continue
 			}
 			klog.V(2).Info("[DeviceService] One round of synchronization is complete")
 		}

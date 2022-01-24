@@ -88,13 +88,11 @@ func (dps *DeviceProfileSyncer) Run(stop <-chan struct{}) {
 			// 3. create deviceProfiles on OpenYurt which are exists in edge platform but not in OpenYurt
 			if err := dps.syncEdgeToKube(redundantEdgeDeviceProfiles); err != nil {
 				klog.V(3).ErrorS(err, "fail to create deviceProfiles on OpenYurt")
-				continue
 			}
 
 			// 4. delete redundant deviceProfiles on OpenYurt
 			if err := dps.deleteDeviceProfiles(redundantKubeDeviceProfiles); err != nil {
 				klog.V(3).ErrorS(err, "fail to delete redundant deviceProfiles on OpenYurt")
-				continue
 			}
 
 			// 5. update deviceProfiles on OpenYurt
