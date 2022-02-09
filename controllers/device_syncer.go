@@ -87,19 +87,16 @@ func (ds *DeviceSyncer) Run(stop <-chan struct{}) {
 			// 3. create device on OpenYurt which are exists in edge platform but not in OpenYurt
 			if err := ds.syncEdgeToKube(redundantEdgeDevices); err != nil {
 				klog.V(3).ErrorS(err, "fail to create devices on OpenYurt")
-				continue
 			}
 
 			// 4. delete redundant device on OpenYurt
 			if err := ds.deleteDevices(redundantKubeDevices); err != nil {
 				klog.V(3).ErrorS(err, "fail to delete redundant devices on OpenYurt")
-				continue
 			}
 
 			// 5. update device status on OpenYurt
 			if err := ds.updateDevices(syncedDevices); err != nil {
 				klog.V(3).ErrorS(err, "fail to update devices status")
-				continue
 			}
 			klog.V(2).Info("[Device] One round of synchronization is complete")
 		}
@@ -153,8 +150,10 @@ func (ds *DeviceSyncer) findDiffDevice(
 		ed := edgeDevices[i]
 		edName := util.GetEdgeDeviceName(&ed, EdgeXObjectName)
 		if _, exists := kubeDevices[edName]; !exists {
+			klog.V(5).Infof("found redundant edge device %s", edName)
 			redundantEdgeDevices[edName] = ds.completeCreateContent(&ed)
 		} else {
+			klog.V(5).Infof("found device %s to be synced", edName)
 			kd := kubeDevices[edName]
 			syncedDevices[edName] = ds.completeUpdateContent(&kd, &ed)
 		}
