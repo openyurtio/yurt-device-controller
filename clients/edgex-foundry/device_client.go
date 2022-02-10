@@ -22,10 +22,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
+	"time"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
 	"github.com/go-resty/resty/v2"
+	"golang.org/x/net/publicsuffix"
 	"k8s.io/klog/v2"
 
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
@@ -198,7 +201,12 @@ func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName
 
 // getPropertyState returns different error messages according to the status code
 func getPropertyState(getURL string) (*resty.Response, error) {
-	resp, err := resty.New().R().Get(getURL)
+	cookieJar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	// TODO: no need to instantiate a client for every request
+	resp, err := resty.NewWithClient(&http.Client{
+		Jar:     cookieJar,
+		Timeout: 10 * time.Second,
+	}).R().Get(getURL)
 	if err != nil {
 		return resp, err
 	}
@@ -219,18 +227,26 @@ func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyN
 	acturalDeviceName := getEdgeDeviceName(d)
 
 	dps := d.Spec.DeviceProperties[propertyName]
+	parameterName := dps.Name
 	if dps.PutURL == "" {
-		putURL, err := efc.getPropertyPutURL(acturalDeviceName, dps.Name)
+		put, err := efc.getPropertyPut(acturalDeviceName, dps.Name)
 		if err != nil {
 			return err
 		}
-		dps.PutURL = putURL
+		dps.PutURL = put.URL
+		if len(put.ParameterNames) == 1 {
+			parameterName = put.ParameterNames[0]
+		}
+
 	}
 	// set the device property to desired state
-	klog.V(5).Infof("setting the property %s to desired value", dps.Name)
+	bodyMap := make(map[string]string)
+	bodyMap[parameterName] = dps.DesiredValue
+	body, _ := json.Marshal(bodyMap)
+	klog.V(5).Infof("setting the property %s to desired value", "propertyName", parameterName, "desiredValue", string(body))
 	rep, err := resty.New().R().
 		SetHeader("Content-Type", "application/json").
-		SetBody([]byte(fmt.Sprintf(`{"%s": "%s"}`, dps.Name, dps.DesiredValue))).
+		SetBody(body).
 		Put(dps.PutURL)
 	if err != nil {
 		return err
@@ -246,18 +262,18 @@ func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyN
 	return nil
 }
 
-// Gets the putURL from edgex foundry which is used to set the device property's value
-func (efc *EdgexDeviceClient) getPropertyPutURL(deviceName, cmdName string) (string, error) {
+// Gets the models.Put from edgex foundry which is used to set the device property's value
+func (efc *EdgexDeviceClient) getPropertyPut(deviceName, cmdName string) (models.Put, error) {
 	cr, err := efc.GetCommandResponseByName(deviceName)
 	if err != nil {
-		return "", err
+		return models.Put{}, err
 	}
 	for _, c := range cr.Commands {
 		if cmdName == c.Name {
-			return c.Put.URL, nil
+			return c.Put, nil
 		}
 	}
-	return "", errors.New("corresponding command is not found")
+	return models.Put{}, errors.New("corresponding command is not found")
 }
 
 // ListPropertiesState gets all the actual property information about a device
@@ -277,6 +293,7 @@ func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *d
 		dps[c.Name] = devicev1alpha1.DesiredPropertyState{Name: c.Name, PutURL: c.Put.URL}
 		if err != nil {
 			aps[c.Name] = devicev1alpha1.ActualPropertyState{Name: c.Name, GetURL: c.Get.URL}
+			klog.V(5).ErrorS(err, "getPropertyState failed", "propertyName", c.Name, "deviceName", actualDeviceName)
 		} else {
 			var event models.Event
 			if err := json.Unmarshal(resp.Body(), &event); err != nil {

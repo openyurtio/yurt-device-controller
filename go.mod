@@ -9,6 +9,7 @@ require (
 	github.com/onsi/gomega v1.14.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
+	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	k8s.io/apimachinery v0.21.3
 	k8s.io/client-go v0.21.3
 	k8s.io/klog/v2 v2.9.0
