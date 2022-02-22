@@ -121,7 +121,7 @@ func (dps *DeviceProfileSyncer) getAllDeviceProfiles() (
 	}
 	// 2. list deviceProfiles on OpenYurt (filter objects belonging to edgeServer)
 	var kDps devicev1alpha1.DeviceProfileList
-	listOptions := client.MatchingFields{"spec.nodePool": dps.NodePool}
+	listOptions := client.MatchingFields{util.IndexerPathForNodepool: dps.NodePool}
 	if err = dps.List(context.TODO(), &kDps, listOptions, client.InNamespace(dps.Namespace)); err != nil {
 		klog.V(4).ErrorS(err, "fail to list the deviceProfiles on the Kubernetes")
 		return edgeDeviceProfiles, kubeDeviceProfiles, err

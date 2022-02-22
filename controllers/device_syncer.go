@@ -120,7 +120,7 @@ func (ds *DeviceSyncer) getAllDevices() (map[string]devicev1alpha1.Device, map[s
 	}
 	// 2. list devices on OpenYurt (filter objects belonging to edgeServer)
 	var kDevs devicev1alpha1.DeviceList
-	listOptions := client.MatchingFields{"spec.nodePool": ds.NodePool}
+	listOptions := client.MatchingFields{util.IndexerPathForNodepool: ds.NodePool}
 	if err = ds.List(context.TODO(), &kDevs, listOptions, client.InNamespace(ds.Namespace)); err != nil {
 		klog.V(4).ErrorS(err, "fail to list the devices object on the OpenYurt")
 		return edgeDevice, kubeDevice, err
