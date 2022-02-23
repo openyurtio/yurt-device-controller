@@ -13,10 +13,29 @@ spec:
     kind: Device
     listKind: DeviceList
     plural: devices
+    shortNames:
+    - dev
     singular: device
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The nodepool of device
+      jsonPath: .spec.nodePool
+      name: NODEPOOL
+      type: string
+    - description: The synced status of device
+      jsonPath: .status.synced
+      name: SYNCED
+      type: boolean
+    - description: The managed status of device
+      jsonPath: .spec.managed
+      name: MANAGED
+      priority: 1
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Device is the Schema for the devices API

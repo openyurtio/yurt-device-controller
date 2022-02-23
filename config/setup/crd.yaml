@@ -11,10 +11,24 @@ spec:
     kind: DeviceProfile
     listKind: DeviceProfileList
     plural: deviceprofiles
+    shortNames:
+    - dp
     singular: deviceprofile
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The nodepool of deviceProfile
+      jsonPath: .spec.nodePool
+      name: NODEPOOL
+      type: string
+    - description: The synced status of deviceProfile
+      jsonPath: .status.synced
+      name: SYNCED
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: DeviceProfile represents the attributes and operational capabilities of a device. It is a template for which there can be multiple matching devices within a given system. NOTE This struct is derived from edgex/go-mod-core-contracts/models/deviceprofile.go
@@ -252,10 +266,10 @@ spec:
           status:
             description: DeviceProfileStatus defines the observed state of DeviceProfile
             properties:
-              Synced:
-                type: boolean
               id:
                 type: string
+              synced:
+                type: boolean
             type: object
         type: object
     served: true
@@ -282,10 +296,29 @@ spec:
     kind: Device
     listKind: DeviceList
     plural: devices
+    shortNames:
+    - dev
     singular: device
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The nodepool of device
+      jsonPath: .spec.nodePool
+      name: NODEPOOL
+      type: string
+    - description: The synced status of device
+      jsonPath: .status.synced
+      name: SYNCED
+      type: boolean
+    - description: The managed status of device
+      jsonPath: .spec.managed
+      name: MANAGED
+      priority: 1
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Device is the Schema for the devices API
@@ -448,10 +481,29 @@ spec:
     kind: DeviceService
     listKind: DeviceServiceList
     plural: deviceservices
+    shortNames:
+    - dsvc
     singular: deviceservice
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The nodepool of deviceService
+      jsonPath: .spec.nodePool
+      name: NODEPOOL
+      type: string
+    - description: The synced status of deviceService
+      jsonPath: .status.synced
+      name: SYNCED
+      type: boolean
+    - description: The managed status of deviceService
+      jsonPath: .spec.managed
+      name: MANAGED
+      priority: 1
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: DeviceService is the Schema for the deviceservices API

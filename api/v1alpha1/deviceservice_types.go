@@ -94,6 +94,11 @@ type DeviceServiceStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:shortName=dsvc
+//+kubebuilder:printcolumn:name="NODEPOOL",type="string",JSONPath=".spec.nodePool",description="The nodepool of deviceService"
+//+kubebuilder:printcolumn:name="SYNCED",type="boolean",JSONPath=".status.synced",description="The synced status of deviceService"
+//+kubebuilder:printcolumn:name="MANAGED",type="boolean",priority=1,JSONPath=".spec.managed",description="The managed status of deviceService"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // DeviceService is the Schema for the deviceservices API
 type DeviceService struct {
