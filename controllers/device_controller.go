@@ -216,8 +216,8 @@ func (r *DeviceReconciler) reconcileUpdateDevice(ctx context.Context, d *devicev
 
 	// 2. reconciling the device properties' value
 	klog.V(3).Infof("DeviceName: %s, reconciling the device properties", d.GetName())
-	// property updates are made only when the device is operational and unlocked
-	if newDeviceStatus.OperatingState == devicev1alpha1.Enabled && newDeviceStatus.AdminState == devicev1alpha1.UnLocked {
+	// property updates are made only when the device is up and unlocked
+	if newDeviceStatus.OperatingState == devicev1alpha1.Up && newDeviceStatus.AdminState == devicev1alpha1.UnLocked {
 		newDeviceStatus, failedPropertyNames = r.reconcileDeviceProperties(d, newDeviceStatus)
 	}
 
@@ -254,8 +254,12 @@ func (r *DeviceReconciler) reconcileDeviceProperties(d *devicev1alpha1.Device, d
 		klog.V(4).Infof("DeviceName: %s, getting the actual value of property: %s", d.GetName(), propertyName)
 		actualProperty, err := r.deviceCli.GetPropertyState(nil, propertyName, d, iotcli.GetOptions{})
 		if err != nil {
-			failedPropertyNames = append(failedPropertyNames, propertyName)
-			continue
+			if !iotcli.IsNotFoundErr(err) {
+				klog.Errorf("DeviceName: %s, failed to get actual property value of %s, err:%v", d.GetName(), propertyName, err)
+				failedPropertyNames = append(failedPropertyNames, propertyName)
+				continue
+			}
+			klog.Errorf("DeviceName: %s, property read command not found", d.GetName())
 		}
 		klog.V(4).Infof("DeviceName: %s, got the actual property state, {Name: %s, GetURL: %s, ActualValue: %s}",
 			d.GetName(), propertyName, actualProperty.GetURL, actualProperty.ActualValue)
@@ -266,11 +270,11 @@ func (r *DeviceReconciler) reconcileDeviceProperties(d *devicev1alpha1.Device, d
 		newDeviceStatus.DeviceProperties[propertyName] = *actualProperty
 
 		// 1.2. set the device attribute in the edge platform to the expected value
-		if desiredProperty.DesiredValue != actualProperty.ActualValue {
+		if actualProperty == nil || desiredProperty.DesiredValue != actualProperty.ActualValue {
 			klog.V(4).Infof("DeviceName: %s, the desired value and the actual value are different, desired: %s, actual: %s",
 				d.GetName(), desiredProperty.DesiredValue, actualProperty.ActualValue)
 			if err := r.deviceCli.UpdatePropertyState(nil, propertyName, d, iotcli.UpdateOptions{}); err != nil {
-				klog.V(4).ErrorS(err, "failed to update property", "DeviceName", d.GetName(), "propertyName", propertyName)
+				klog.ErrorS(err, "failed to update property", "DeviceName", d.GetName(), "propertyName", propertyName)
 				failedPropertyNames = append(failedPropertyNames, propertyName)
 				continue
 			}

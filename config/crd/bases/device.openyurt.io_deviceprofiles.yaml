@@ -52,211 +52,87 @@ spec:
           spec:
             description: DeviceProfileSpec defines the desired state of DeviceProfile
             properties:
-              coreCommands:
-                items:
-                  properties:
-                    get:
-                      description: Get Command
-                      properties:
-                        path:
-                          description: Path used by service for action on a device
-                            or sensor
-                          type: string
-                        responses:
-                          description: Responses from get or put requests to service
-                          items:
-                            description: Response for a Get or Put request to a service
-                            properties:
-                              code:
-                                type: string
-                              description:
-                                type: string
-                              expectedValues:
-                                items:
-                                  type: string
-                                type: array
-                            type: object
-                          type: array
-                        url:
-                          description: Url for requests from command service
-                          type: string
-                      type: object
-                    id:
-                      description: EdgeId is a unique identifier used by EdgeX Foundry,
-                        such as a UUID
-                      type: string
-                    name:
-                      description: Command name (unique on the profile)
-                      type: string
-                    put:
-                      description: Put Command
-                      properties:
-                        parameterNames:
-                          items:
-                            type: string
-                          type: array
-                        path:
-                          description: Path used by service for action on a device
-                            or sensor
-                          type: string
-                        responses:
-                          description: Responses from get or put requests to service
-                          items:
-                            description: Response for a Get or Put request to a service
-                            properties:
-                              code:
-                                type: string
-                              description:
-                                type: string
-                              expectedValues:
-                                items:
-                                  type: string
-                                type: array
-                            type: object
-                          type: array
-                        url:
-                          description: Url for requests from command service
-                          type: string
-                      type: object
-                  type: object
-                type: array
               description:
                 type: string
               deviceCommands:
-                description: TODO support the following field
                 items:
                   properties:
-                    get:
-                      items:
-                        properties:
-                          deviceCommand:
-                            description: The replacement of Resource field
-                            type: string
-                          deviceResource:
-                            description: The replacement of Object field
-                            type: string
-                          index:
-                            type: string
-                          mappings:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          object:
-                            description: Deprecated
-                            type: string
-                          operation:
-                            type: string
-                          parameter:
-                            type: string
-                          resource:
-                            description: Deprecated
-                            type: string
-                          secondary:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      type: array
+                    isHidden:
+                      type: boolean
                     name:
                       type: string
-                    set:
+                    readWrite:
+                      type: string
+                    resourceOperations:
                       items:
                         properties:
-                          deviceCommand:
-                            description: The replacement of Resource field
+                          defaultValue:
                             type: string
                           deviceResource:
-                            description: The replacement of Object field
-                            type: string
-                          index:
                             type: string
                           mappings:
                             additionalProperties:
                               type: string
                             type: object
-                          object:
-                            description: Deprecated
-                            type: string
-                          operation:
-                            type: string
-                          parameter:
-                            type: string
-                          resource:
-                            description: Deprecated
-                            type: string
-                          secondary:
-                            items:
-                              type: string
-                            type: array
+                        required:
+                        - defaultValue
                         type: object
                       type: array
+                  required:
+                  - isHidden
+                  - name
+                  - readWrite
+                  - resourceOperations
                   type: object
                 type: array
               deviceResources:
                 items:
                   properties:
                     attributes:
-                      additionalProperties:
-                        type: string
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     description:
                       type: string
+                    isHidden:
+                      type: boolean
                     name:
                       type: string
                     properties:
                       properties:
+                        assertion:
+                          type: string
+                        base:
+                          type: string
+                        defaultValue:
+                          type: string
+                        mask:
+                          type: string
+                        maximum:
+                          type: string
+                        mediaType:
+                          type: string
+                        minimum:
+                          type: string
+                        offset:
+                          type: string
+                        readWrite:
+                          type: string
+                        scale:
+                          type: string
+                        shift:
+                          type: string
                         units:
-                          properties:
-                            defaultValue:
-                              type: string
-                            readWrite:
-                              type: string
-                            type:
-                              type: string
-                          type: object
-                        value:
-                          properties:
-                            assertion:
-                              description: Required value of the property, set for
-                                checking error state. Failing an assertion condition
-                                wil  l mark the device with an error state
-                              type: string
-                            base:
-                              type: string
-                            defaultValue:
-                              type: string
-                            floatEncoding:
-                              type: string
-                            mask:
-                              type: string
-                            maximum:
-                              type: string
-                            mediaType:
-                              type: string
-                            minimum:
-                              type: string
-                            offset:
-                              type: string
-                            precision:
-                              type: string
-                            readWrite:
-                              type: string
-                            scale:
-                              type: string
-                            shift:
-                              type: string
-                            size:
-                              type: string
-                            type:
-                              type: string
-                          type: object
+                          type: string
+                        valueType:
+                          type: string
                       required:
-                      - value
+                      - valueType
                       type: object
                     tag:
                       type: string
                   required:
                   - description
+                  - isHidden
                   - name
                   - properties
                   type: object

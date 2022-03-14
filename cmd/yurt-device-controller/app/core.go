@@ -111,16 +111,6 @@ func Run(opts *options.YurtDeviceControllerOptions, stopCh <-chan struct{}) {
 		}
 	}
 
-	setupLog.Info("[add controllers] Adding controllers and syncers for valueDescriptor, device, deviceProfile and deviceService")
-	// setup the ValueDescriptor Reconciler
-	if err = (&controllers.ValueDescriptorReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, opts); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ValueDescriptor")
-		os.Exit(1)
-	}
-
 	// setup the DeviceProfile Reconciler and Syncer
 	if err = (&controllers.DeviceProfileReconciler{
 		Client: mgr.GetClient(),

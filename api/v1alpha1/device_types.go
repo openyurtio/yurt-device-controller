@@ -39,8 +39,9 @@ const (
 type OperatingState string
 
 const (
-	Enabled  OperatingState = "ENABLED"
-	Disabled OperatingState = "DISABLED"
+	Unknown OperatingState = "UNKNOWN"
+	Up      OperatingState = "UP"
+	Down    OperatingState = "DOWN"
 )
 
 type ProtocolProperties map[string]string
@@ -59,11 +60,13 @@ type DeviceSpec struct {
 	Labels []string `json:"labels,omitempty"`
 	// Device service specific location (interface{} is an empty interface so
 	// it can be anything)
+	// TODO: location type in edgex is interface{}
 	Location string `json:"location,omitempty"`
 	// Associated Device Service - One per device
-	Service string `json:"service"`
+	Service string `json:"serviceName"`
 	// Associated Device Profile - Describes the device
-	Profile string `json:"profile"`
+	Profile string `json:"profileName"`
+	Notify  bool   `json:"notify"`
 	// True means device is managed by cloud, cloud can update the related fields
 	// False means cloud can't update the fields
 	Managed bool `json:"managed,omitempty"`
@@ -103,7 +106,7 @@ type DeviceStatus struct {
 	EdgeId           string                         `json:"edgeId,omitempty"`
 	// Admin state (locked/unlocked)
 	AdminState AdminState `json:"adminState,omitempty"`
-	// Operating state (enabled/disabled)
+	// Operating state (up/down/unknown)
 	OperatingState OperatingState `json:"operatingState,omitempty"`
 	// current device state
 	// +optional

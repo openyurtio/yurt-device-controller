@@ -3,7 +3,7 @@ module github.com/openyurtio/device-controller
 go 1.15
 
 require (
-	github.com/edgexfoundry/go-mod-core-contracts v0.1.111
+	github.com/edgexfoundry/go-mod-core-contracts/v2 v2.1.0
 	github.com/go-resty/resty/v2 v2.4.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0

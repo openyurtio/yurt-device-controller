@@ -55,47 +55,10 @@ spec:
           spec:
             description: DeviceServiceSpec defines the desired state of DeviceService
             properties:
-              addressable:
-                description: address (MQTT topic, HTTP address, serial bus, etc.)
-                  for reaching the service
-                properties:
-                  address:
-                    description: Address of the addressable
-                    type: string
-                  id:
-                    description: ID is a unique identifier for the Addressable, such
-                      as a UUID
-                    type: string
-                  method:
-                    description: Method for connecting (i.e. POST)
-                    type: string
-                  name:
-                    description: Name is a unique name given to the Addressable
-                    type: string
-                  password:
-                    description: Password of the user for authentication for the addressable
-                    type: string
-                  path:
-                    description: Path for callbacks
-                    type: string
-                  port:
-                    description: Port for the address
-                    type: integer
-                  protocol:
-                    description: Protocol for the address (HTTP/TCP)
-                    type: string
-                  publisher:
-                    description: For message bus protocols
-                    type: string
-                  topic:
-                    description: Topic for message bus addressables
-                    type: string
-                  user:
-                    description: User id for authentication
-                    type: string
-                type: object
               adminState:
                 description: Device Service Admin State
+                type: string
+              baseAddress:
                 type: string
               description:
                 description: Information describing the device
@@ -114,9 +77,8 @@ spec:
                 description: NodePool indicates which nodePool the deviceService comes
                   from
                 type: string
-              operatingState:
-                description: operational state - either enabled or disabled
-                type: string
+            required:
+            - baseAddress
             type: object
           status:
             description: DeviceServiceStatus defines the observed state of DeviceService

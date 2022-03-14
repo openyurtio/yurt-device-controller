@@ -222,7 +222,7 @@ func (ds *DeviceServiceSyncer) completeCreateContent(edgeDS *devicev1alpha1.Devi
 	createDevice := edgeDS.DeepCopy()
 	createDevice.Spec.NodePool = ds.NodePool
 	createDevice.Namespace = ds.Namespace
-	createDevice.Name = strings.Join([]string{ds.NodePool, createDevice.Name}, "-")
+	createDevice.Name = strings.Join([]string{ds.NodePool, edgeDS.Name}, "-")
 	createDevice.Spec.Managed = false
 	return createDevice
 }
