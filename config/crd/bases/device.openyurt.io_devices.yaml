@@ -84,8 +84,9 @@ spec:
                   type: string
                 type: array
               location:
-                description: Device service specific location (interface{} is an empty
-                  interface so it can be anything)
+                description: 'Device service specific location (interface{} is an
+                  empty interface so it can be anything) TODO: location type in edgex
+                  is interface{}'
                 type: string
               managed:
                 description: True means device is managed by cloud, cloud can update
@@ -94,10 +95,12 @@ spec:
               nodePool:
                 description: NodePool indicates which nodePool the device comes from
                 type: string
+              notify:
+                type: boolean
               operatingState:
                 description: Operating state (enabled/disabled)
                 type: string
-              profile:
+              profileName:
                 description: Associated Device Profile - Describes the device
                 type: string
               protocols:
@@ -107,12 +110,13 @@ spec:
                   type: object
                 description: A map of supported protocols for the given device
                 type: object
-              service:
+              serviceName:
                 description: Associated Device Service - One per device
                 type: string
             required:
-            - profile
-            - service
+            - notify
+            - profileName
+            - serviceName
             type: object
           status:
             description: DeviceStatus defines the observed state of Device
@@ -192,7 +196,7 @@ spec:
                 format: int64
                 type: integer
               operatingState:
-                description: Operating state (enabled/disabled)
+                description: Operating state (up/down/unknown)
                 type: string
               synced:
                 description: Synced indicates whether the device already exists on

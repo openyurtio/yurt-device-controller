@@ -29,43 +29,14 @@ const (
 	DeviceServiceManagingCondition clusterv1.ConditionType = "DeviceServiceManaging"
 )
 
-type Addressable struct {
-	// ID is a unique identifier for the Addressable, such as a UUID
-	Id string `json:"id,omitempty"`
-	// Name is a unique name given to the Addressable
-	Name string `json:"name,omitempty"`
-	// Protocol for the address (HTTP/TCP)
-	Protocol string `json:"protocol,omitempty"`
-	// Method for connecting (i.e. POST)
-	HTTPMethod string `json:"method,omitempty"`
-	// Address of the addressable
-	Address string `json:"address,omitempty"`
-	// Port for the address
-	Port int `json:"port,omitempty"`
-	// Path for callbacks
-	Path string `json:"path,omitempty"`
-	// For message bus protocols
-	Publisher string `json:"publisher,omitempty"`
-	// User id for authentication
-	User string `json:"user,omitempty"`
-	// Password of the user for authentication for the addressable
-	Password string `json:"password,omitempty"`
-	// Topic for message bus addressables
-	Topic string `json:"topic,omitempty"`
-}
-
 // DeviceServiceSpec defines the desired state of DeviceService
 type DeviceServiceSpec struct {
+	BaseAddress string `json:"baseAddress"`
 	// Information describing the device
 	Description string `json:"description,omitempty"`
-	// operational state - either enabled or disabled
-	OperatingState OperatingState `json:"operatingState,omitempty"`
 	// tags or other labels applied to the device service for search or other
 	// identification needs on the EdgeX Foundry
 	Labels []string `json:"labels,omitempty"`
-	// address (MQTT topic, HTTP address, serial bus, etc.) for reaching
-	// the service
-	Addressable Addressable `json:"addressable,omitempty"`
 	// Device Service Admin State
 	AdminState AdminState `json:"adminState,omitempty"`
 	// True means deviceService is managed by cloud, cloud can update the related fields

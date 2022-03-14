@@ -103,7 +103,6 @@ generate: controller-gen
 		paths="./api/v1alpha1/device_types.go" \
 		paths="./api/v1alpha1/deviceservice_types.go" \
 		paths="./api/v1alpha1/deviceprofile_types.go" \
-		paths="./api/v1alpha1/valuedescriptor_types.go" \
 		paths="./api/v1alpha1/groupversion_info.go"
 
 # Download controller-gen locally if necessary
