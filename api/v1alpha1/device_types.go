@@ -112,6 +112,11 @@ type DeviceStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:shortName=dev
+//+kubebuilder:printcolumn:name="NODEPOOL",type="string",JSONPath=".spec.nodePool",description="The nodepool of device"
+//+kubebuilder:printcolumn:name="SYNCED",type="boolean",JSONPath=".status.synced",description="The synced status of device"
+//+kubebuilder:printcolumn:name="MANAGED",type="boolean",priority=1,JSONPath=".spec.managed",description="The managed status of device"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Device is the Schema for the devices API
 type Device struct {

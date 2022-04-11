@@ -13,10 +13,29 @@ spec:
     kind: DeviceService
     listKind: DeviceServiceList
     plural: deviceservices
+    shortNames:
+    - dsvc
     singular: deviceservice
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The nodepool of deviceService
+      jsonPath: .spec.nodePool
+      name: NODEPOOL
+      type: string
+    - description: The synced status of deviceService
+      jsonPath: .status.synced
+      name: SYNCED
+      type: boolean
+    - description: The managed status of deviceService
+      jsonPath: .spec.managed
+      name: MANAGED
+      priority: 1
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: DeviceService is the Schema for the deviceservices API

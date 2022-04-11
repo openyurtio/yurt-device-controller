@@ -13,10 +13,24 @@ spec:
     kind: DeviceProfile
     listKind: DeviceProfileList
     plural: deviceprofiles
+    shortNames:
+    - dp
     singular: deviceprofile
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The nodepool of deviceProfile
+      jsonPath: .spec.nodePool
+      name: NODEPOOL
+      type: string
+    - description: The synced status of deviceProfile
+      jsonPath: .status.synced
+      name: SYNCED
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: DeviceProfile represents the attributes and operational capabilities
@@ -267,10 +281,10 @@ spec:
           status:
             description: DeviceProfileStatus defines the observed state of DeviceProfile
             properties:
-              Synced:
-                type: boolean
               id:
                 type: string
+              synced:
+                type: boolean
             type: object
         type: object
     served: true

@@ -142,11 +142,15 @@ type DeviceProfileSpec struct {
 // DeviceProfileStatus defines the observed state of DeviceProfile
 type DeviceProfileStatus struct {
 	EdgeId string `json:"id,omitempty"`
-	Synced bool   `json:"Synced,omitempty"`
+	Synced bool   `json:"synced,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:shortName=dp
+//+kubebuilder:printcolumn:name="NODEPOOL",type="string",JSONPath=".spec.nodePool",description="The nodepool of deviceProfile"
+//+kubebuilder:printcolumn:name="SYNCED",type="boolean",JSONPath=".status.synced",description="The synced status of deviceProfile"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // DeviceProfile represents the attributes and operational capabilities of a device.
 // It is a template for which there can be multiple matching devices within a given system.
