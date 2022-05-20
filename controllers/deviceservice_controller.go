@@ -168,6 +168,19 @@ func (r *DeviceServiceReconciler) reconcileCreateDeviceService(ctx context.Conte
 		if !clis.IsNotFoundErr(err) {
 			klog.V(4).ErrorS(err, "fail to visit the edge platform")
 			return nil
+		} else {
+			createdDs, err := r.deviceServiceCli.Create(nil, ds, edgeInterface.CreateOptions{})
+			if err != nil {
+				klog.V(4).ErrorS(err, "failed to create deviceService on edge platform")
+				conditions.MarkFalse(ds, devicev1alpha1.DeviceServiceSyncedCondition, "failed to add DeviceService to EdgeX", clusterv1.ConditionSeverityWarning, err.Error())
+				return fmt.Errorf("fail to add DeviceService to edge platform: %v", err)
+			}
+
+			klog.V(4).InfoS("Successfully add DeviceService to Edge Platform, Name: %s, EdgeId: %s", ds.GetName(), createdDs.Status.EdgeId)
+			ds.Status.EdgeId = createdDs.Status.EdgeId
+			ds.Status.Synced = true
+			conditions.MarkTrue(ds, devicev1alpha1.DeviceServiceSyncedCondition)
+			return r.Status().Update(ctx, ds)
 		}
 	} else {
 		// a. If object exists, the status of the device on OpenYurt is updated
@@ -176,50 +189,12 @@ func (r *DeviceServiceReconciler) reconcileCreateDeviceService(ctx context.Conte
 		ds.Status.EdgeId = edgeDs.Status.EdgeId
 		return r.Status().Update(ctx, ds)
 	}
-
-	// b. If object does not exist, a request is sent to the edge platform to create a new deviceService and related addressable
-	addressable := ds.Spec.Addressable
-	as, err := r.deviceServiceCli.GetAddressable(nil, addressable.Name, edgeInterface.GetOptions{})
-	if err == nil {
-		klog.V(4).Infof("AddressableName: %s, obj already exists on edge platform", addressable.Name)
-		ds.Spec.Addressable = *as
-	} else if clis.IsNotFoundErr(err) {
-		createdAddr, err := r.deviceServiceCli.CreateAddressable(nil, &addressable, edgeInterface.CreateOptions{})
-		if err != nil {
-			conditions.MarkFalse(ds, devicev1alpha1.DeviceServiceSyncedCondition, "failed to add addressable to EdgeX", clusterv1.ConditionSeverityWarning, err.Error())
-			return fmt.Errorf("failed to add addressable to edge platform: %v", err)
-		}
-		klog.V(4).Infof("Successfully add the Addressable to edge platform, Name: %s, EdgeId: %s", addressable.Name, createdAddr.Id)
-		ds.Spec.Addressable.Id = createdAddr.Id
-	} else {
-		klog.V(4).ErrorS(err, "fail to visit the edge platform core-metatdata-service")
-		conditions.MarkFalse(ds, devicev1alpha1.DeviceServiceSyncedCondition, "failed to visit the EdgeX core-metadata-service", clusterv1.ConditionSeverityWarning, err.Error())
-		return err
-	}
-	if err = r.Update(ctx, ds); err != nil {
-		return err
-	}
-
-	createdDs, err := r.deviceServiceCli.Create(nil, ds, edgeInterface.CreateOptions{})
-	if err != nil {
-		klog.V(4).ErrorS(err, "failed to create deviceService on edge platform")
-		conditions.MarkFalse(ds, devicev1alpha1.DeviceServiceSyncedCondition, "failed to add DeviceService to EdgeX", clusterv1.ConditionSeverityWarning, err.Error())
-		return fmt.Errorf("fail to add DeviceService to edge platform: %v", err)
-	}
-
-	klog.V(4).InfoS("Successfully add DeviceService to Edge Platform, Name: %s, EdgeId: %s", ds.GetName(), createdDs.Status.EdgeId)
-	ds.Status.EdgeId = createdDs.Status.EdgeId
-	ds.Status.Synced = true
-	conditions.MarkTrue(ds, devicev1alpha1.DeviceServiceSyncedCondition)
-	return r.Status().Update(ctx, ds)
 }
 
 func (r *DeviceServiceReconciler) reconcileUpdateDeviceService(ctx context.Context, ds *devicev1alpha1.DeviceService) error {
 	// 1. reconciling the AdminState field of deviceService
 	newDeviceServiceStatus := ds.Status.DeepCopy()
 	updateDeviceService := ds.DeepCopy()
-	// do not update deviceService's OperatingState
-	updateDeviceService.Spec.OperatingState = ""
 
 	if ds.Spec.AdminState != "" && ds.Spec.AdminState != ds.Status.AdminState {
 		newDeviceServiceStatus.AdminState = ds.Spec.AdminState

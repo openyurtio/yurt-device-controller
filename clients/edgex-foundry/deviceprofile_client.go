@@ -19,17 +19,16 @@ package edgex_foundry
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
+
 	"github.com/go-resty/resty/v2"
 	"k8s.io/klog/v2"
 
 	"github.com/openyurtio/device-controller/api/v1alpha1"
 	devcli "github.com/openyurtio/device-controller/clients"
-	strutil "github.com/openyurtio/device-controller/controllers/util"
 )
 
 type EdgexDeviceProfile struct {
@@ -44,25 +43,9 @@ func NewEdgexDeviceProfile(coreMetaAddr string) *EdgexDeviceProfile {
 	}
 }
 
+//TODO: support label filtering
 func getListDeviceProfileURL(address string, opts devcli.ListOptions) (string, error) {
-	url := fmt.Sprintf("http://%s%s", address, DeviceProfilePath)
-	if len(opts.LabelSelector) > 1 {
-		return url, fmt.Errorf("Multiple labels: list only support one label")
-	}
-	if len(opts.LabelSelector) > 0 && len(opts.LabelSelector) > 0 {
-		return url, fmt.Errorf("Multi list options: list action can't use 'label' with 'manufacturer' or 'model'")
-	}
-	for _, v := range opts.LabelSelector {
-		url = fmt.Sprintf("%s/label/%s", url, v)
-	}
-
-	listParameters := []string{"manufacturer", "model"}
-	for k, v := range opts.FieldSelector {
-		if !strutil.IsInStringLst(listParameters, k) {
-			return url, fmt.Errorf("Invaild list options: %s", k)
-		}
-		url = fmt.Sprintf("%s/%s/%s", url, k, v)
-	}
+	url := fmt.Sprintf("http://%s%s/all?limit=-1", address, DeviceProfilePath)
 	return url, nil
 }
 
@@ -76,32 +59,32 @@ func (cdc *EdgexDeviceProfile) List(ctx context.Context, opts devcli.ListOptions
 	if err != nil {
 		return nil, err
 	}
-	dps := []models.DeviceProfile{}
-	if err := json.Unmarshal(resp.Body(), &dps); err != nil {
+	var mdpResp responses.MultiDeviceProfilesResponse
+	if err := json.Unmarshal(resp.Body(), &mdpResp); err != nil {
 		return nil, err
 	}
-	deviceProfiles := make([]v1alpha1.DeviceProfile, len(dps))
-	for i, dp := range dps {
-		deviceProfiles[i] = toKubeDeviceProfile(&dp)
+	var deviceProfiles []v1alpha1.DeviceProfile
+	for _, dp := range mdpResp.Profiles {
+		deviceProfiles = append(deviceProfiles, toKubeDeviceProfile(&dp))
 	}
 	return deviceProfiles, nil
 }
 
 func (cdc *EdgexDeviceProfile) Get(ctx context.Context, name string, opts devcli.GetOptions) (*v1alpha1.DeviceProfile, error) {
 	klog.V(5).Infof("will get DeviceProfiles: %s", name)
-	var dp models.DeviceProfile
+	var dpResp responses.DeviceProfileResponse
 	getURL := fmt.Sprintf("http://%s%s/name/%s", cdc.CoreMetaAddr, DeviceProfilePath, name)
 	resp, err := cdc.R().Get(getURL)
 	if err != nil {
 		return nil, err
 	}
-	if string(resp.Body()) == "Item not found\n" {
-		return nil, errors.New("Item not found")
+	if resp.StatusCode() == http.StatusNotFound {
+		return nil, fmt.Errorf("DeviceProfile %s not found", name)
 	}
-	if err = json.Unmarshal(resp.Body(), &dp); err != nil {
+	if err = json.Unmarshal(resp.Body(), &dpResp); err != nil {
 		return nil, err
 	}
-	kubedp := toKubeDeviceProfile(&dp)
+	kubedp := toKubeDeviceProfile(&dpResp.Profile)
 	return &kubedp, nil
 }
 
@@ -124,7 +107,7 @@ func (cdc *EdgexDeviceProfile) Create(ctx context.Context, deviceProfile *v1alph
 	return deviceProfile, err
 }
 
-// TODO
+// TODO: edgex does not support update DeviceProfile
 func (cdc *EdgexDeviceProfile) Update(ctx context.Context, deviceProfile *v1alpha1.DeviceProfile, opts devcli.UpdateOptions) (*v1alpha1.DeviceProfile, error) {
 	return nil, nil
 }

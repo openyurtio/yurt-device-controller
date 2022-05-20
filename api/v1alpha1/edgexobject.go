@@ -20,10 +20,6 @@ type EdgeXObject interface {
 	IsAddedToEdgeX() bool
 }
 
-func (vd *ValueDescriptor) IsAddedToEdgeX() bool {
-	return vd.Status.AddedToEdgeX
-}
-
 func (dp *DeviceProfile) IsAddedToEdgeX() bool {
 	return dp.Status.Synced
 }

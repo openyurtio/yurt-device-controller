@@ -22,9 +22,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
+
 	"github.com/go-resty/resty/v2"
 	"k8s.io/klog/v2"
 
@@ -82,151 +82,71 @@ func (eds *EdgexDeviceServiceClient) Delete(ctx context.Context, name string, op
 // Update is used to set the admin or operating state of the deviceService by unique name of the deviceService.
 // TODO support to update other fields
 func (eds *EdgexDeviceServiceClient) Update(ctx context.Context, ds *v1alpha1.DeviceService, options edgeCli.UpdateOptions) (*v1alpha1.DeviceService, error) {
-	actualDSName := getEdgeDeviceServiceName(ds)
-	putBaseURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, DeviceServicePath, actualDSName)
+	patchURL := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, DeviceServicePath)
 	if ds == nil {
 		return nil, nil
 	}
-	if ds.Spec.AdminState != "" {
-		amURL := fmt.Sprintf("%s/adminstate/%s", putBaseURL, ds.Spec.AdminState)
-		if rep, err := resty.New().R().SetHeader("Content-Type", "application/json").Put(amURL); err != nil {
-			return nil, err
-		} else if rep.StatusCode() != http.StatusOK {
-			return nil, fmt.Errorf("failed to update deviceService: %s, get response: %s", actualDSName, string(rep.Body()))
-		}
+
+	if ds.Status.EdgeId == "" {
+		return nil, fmt.Errorf("failed to update deviceservice %s with empty edgex id", ds.Name)
 	}
-	if ds.Spec.OperatingState != "" {
-		opURL := fmt.Sprintf("%s/opstate/%s", putBaseURL, ds.Spec.OperatingState)
-		if rep, err := resty.New().R().
-			SetHeader("Content-Type", "application/json").Put(opURL); err != nil {
-			return nil, err
-		} else if rep.StatusCode() != http.StatusOK {
-			return nil, fmt.Errorf("failed to update deviceService: %s, get response: %s", actualDSName, string(rep.Body()))
-		}
+	edgeDs := toEdgexDeviceService(ds)
+	edgeDs.Id = ds.Status.EdgeId
+	dsJson, err := json.Marshal(&edgeDs)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := eds.R().
+		SetBody(dsJson).Patch(patchURL)
+	if err != nil {
+		return nil, err
 	}
 
-	return ds, nil
+	if resp.StatusCode() == http.StatusOK || resp.StatusCode() == http.StatusMultiStatus {
+		return ds, nil
+	} else {
+		return nil, fmt.Errorf("request to patch deviceservice failed, errcode:%d", resp.StatusCode())
+	}
 }
 
 // Get is used to query the deviceService information corresponding to the deviceService name
 func (eds *EdgexDeviceServiceClient) Get(ctx context.Context, name string, options edgeCli.GetOptions) (*v1alpha1.DeviceService, error) {
 	klog.V(5).InfoS("will get DeviceServices", "DeviceService", name)
-	var ds v1alpha1.DeviceService
+	var dsResp responses.DeviceServiceResponse
 	getURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, DeviceServicePath, name)
 	resp, err := eds.R().Get(getURL)
 	if err != nil {
-		return &ds, err
+		return nil, err
 	}
-	if string(resp.Body()) == "Item not found\n" ||
-		strings.HasPrefix(string(resp.Body()), "no item found") {
-		return &ds, errors.New("Item not found")
+	if resp.StatusCode() == http.StatusNotFound {
+		return nil, fmt.Errorf("deviceservice %s not found", name)
 	}
-	var dp models.DeviceService
-	err = json.Unmarshal(resp.Body(), &dp)
-	ds = toKubeDeviceService(dp)
-	return &ds, err
+	err = json.Unmarshal(resp.Body(), &dsResp)
+	if err != nil {
+		return nil, err
+	}
+	ds := toKubeDeviceService(dsResp.Service)
+	return &ds, nil
 }
 
 // List is used to get all deviceService objects on edge platform
 // The Hanoi version currently supports only a single label and does not support other filters
 func (eds *EdgexDeviceServiceClient) List(ctx context.Context, options edgeCli.ListOptions) ([]v1alpha1.DeviceService, error) {
 	klog.V(5).Info("will list DeviceServices")
-	lp := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, DeviceServicePath)
-	if options.LabelSelector != nil {
-		if _, ok := options.LabelSelector["label"]; ok {
-			lp = strings.Join([]string{lp, strings.Join([]string{"label", options.LabelSelector["label"]}, "/")}, "/")
-		}
-	}
+	lp := fmt.Sprintf("http://%s%s/all?limit=-1", eds.CoreMetaAddr, DeviceServicePath)
 	resp, err := eds.R().
 		EnableTrace().
 		Get(lp)
 	if err != nil {
 		return nil, err
 	}
-	dss := []models.DeviceService{}
-	if err := json.Unmarshal(resp.Body(), &dss); err != nil {
+	var mdsResponse responses.MultiDeviceServicesResponse
+	if err := json.Unmarshal(resp.Body(), &mdsResponse); err != nil {
 		return nil, err
 	}
 	var res []v1alpha1.DeviceService
-	for _, ds := range dss {
+	for _, ds := range mdsResponse.Services {
 		res = append(res, toKubeDeviceService(ds))
-	}
-	return res, nil
-}
-
-// CreateAddressable function sends a POST request to EdgeX to add a new addressable
-func (eds *EdgexDeviceServiceClient) CreateAddressable(ctx context.Context, addressable *v1alpha1.Addressable, options edgeCli.CreateOptions) (*v1alpha1.Addressable, error) {
-	as := toEdgeXAddressable(addressable)
-	klog.V(5).InfoS("will add the Addressable", "Addressable", as.Name)
-	dpJson, err := json.Marshal(&as)
-	if err != nil {
-		return nil, err
-	}
-	postPath := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, AddressablePath)
-	resp, err := eds.R().
-		SetBody(dpJson).Post(postPath)
-	if err != nil {
-		return nil, err
-	}
-	createdAddr := addressable.DeepCopy()
-	createdAddr.Id = string(resp.Body())
-	return createdAddr, err
-}
-
-// DeleteAddressable function sends a request to EdgeX to delete a addressable
-func (eds *EdgexDeviceServiceClient) DeleteAddressable(ctx context.Context, name string, options edgeCli.DeleteOptions) error {
-	klog.V(5).InfoS("will delete the Addressable", "Addressable", name)
-	delURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, AddressablePath, name)
-	resp, err := eds.R().Delete(delURL)
-	if err != nil {
-		return err
-	}
-	if string(resp.Body()) != "true" {
-		return errors.New(string(resp.Body()))
-	}
-	return nil
-}
-
-// UpdateAddressable is used to update the addressable on edgex foundry
-func (eds *EdgexDeviceServiceClient) UpdateAddressable(ctx context.Context, device *v1alpha1.Addressable, options edgeCli.UpdateOptions) (*v1alpha1.Addressable, error) {
-	return nil, nil
-}
-
-// GetAddressable is used to query the addressable information corresponding to the addressable name
-func (eds *EdgexDeviceServiceClient) GetAddressable(ctx context.Context, name string, options edgeCli.GetOptions) (*v1alpha1.Addressable, error) {
-	klog.V(5).InfoS("will get Addressable", "Addressable", name)
-	var addressable v1alpha1.Addressable
-	getURL := fmt.Sprintf("http://%s%s/name/%s", eds.CoreMetaAddr, AddressablePath, name)
-	resp, err := eds.R().Get(getURL)
-	if err != nil {
-		return &addressable, err
-	}
-	if string(resp.Body()) == "Item not found\n" {
-		return &addressable, errors.New("Item not found")
-	}
-	var maddr models.Addressable
-	err = json.Unmarshal(resp.Body(), &maddr)
-	addressable = toKubeAddressable(maddr)
-	return &addressable, err
-}
-
-// ListAddressables is used to get all addressable objects on edge platform
-func (eds *EdgexDeviceServiceClient) ListAddressables(ctx context.Context, options edgeCli.ListOptions) ([]v1alpha1.Addressable, error) {
-	klog.V(5).Info("will list Addressables")
-	lp := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, AddressablePath)
-	resp, err := eds.R().
-		EnableTrace().
-		Get(lp)
-	if err != nil {
-		return nil, err
-	}
-	ass := []models.Addressable{}
-	if err := json.Unmarshal(resp.Body(), &ass); err != nil {
-		return nil, err
-	}
-	var res []v1alpha1.Addressable
-	for i := range ass {
-		res = append(res, toKubeAddressable(ass[i]))
 	}
 	return res, nil
 }

@@ -26,11 +26,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos"
+
+	edgex_resp "github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
 	"github.com/go-resty/resty/v2"
 	"golang.org/x/net/publicsuffix"
 	"k8s.io/klog/v2"
 
+	"github.com/openyurtio/device-controller/api/v1alpha1"
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	edgeCli "github.com/openyurtio/device-controller/clients"
 )
@@ -120,40 +123,37 @@ func (efc *EdgexDeviceClient) Update(ctx context.Context, device *devicev1alpha1
 // Get is used to query the device information corresponding to the device name
 func (efc *EdgexDeviceClient) Get(ctx context.Context, deviceName string, options edgeCli.GetOptions) (*devicev1alpha1.Device, error) {
 	klog.V(5).Infof("will get Devices: %s", deviceName)
-	var device devicev1alpha1.Device
+	var dResp edgex_resp.DeviceResponse
 	getURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, deviceName)
 	resp, err := efc.R().Get(getURL)
 	if err != nil {
-		return &device, err
+		return nil, err
 	}
-	if string(resp.Body()) == "Item not found\n" {
-		return &device, errors.New("Item not found")
+	if resp.StatusCode() == http.StatusNotFound {
+		return nil, fmt.Errorf("Device %s not found", deviceName)
 	}
-	var dp models.Device
-	err = json.Unmarshal(resp.Body(), &dp)
-	device = toKubeDevice(dp)
+	err = json.Unmarshal(resp.Body(), &dResp)
+	if err != nil {
+		return nil, err
+	}
+	device := toKubeDevice(dResp.Device)
 	return &device, err
 }
 
 // List is used to get all device objects on edge platform
-// The Hanoi version currently supports only a single label and does not support other filters
+// TODO:support label filtering according to options
 func (efc *EdgexDeviceClient) List(ctx context.Context, options edgeCli.ListOptions) ([]devicev1alpha1.Device, error) {
-	lp := fmt.Sprintf("http://%s%s", efc.CoreMetaAddr, DevicePath)
-	if options.LabelSelector != nil {
-		if _, ok := options.LabelSelector["label"]; ok {
-			lp = strings.Join([]string{lp, strings.Join([]string{"label", options.LabelSelector["label"]}, "/")}, "/")
-		}
-	}
+	lp := fmt.Sprintf("http://%s%s/all?limit=-1", efc.CoreMetaAddr, DevicePath)
 	resp, err := efc.R().EnableTrace().Get(lp)
 	if err != nil {
 		return nil, err
 	}
-	dps := []models.Device{}
-	if err := json.Unmarshal(resp.Body(), &dps); err != nil {
+	var mdResp edgex_resp.MultiDevicesResponse
+	if err := json.Unmarshal(resp.Body(), &mdResp); err != nil {
 		return nil, err
 	}
 	var res []devicev1alpha1.Device
-	for _, dp := range dps {
+	for _, dp := range mdResp.Devices {
 		res = append(res, toKubeDevice(dp))
 	}
 	return res, nil
@@ -164,20 +164,20 @@ func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName
 	// get the old property from status
 	oldAps, exist := d.Status.DeviceProperties[propertyName]
 	propertyGetURL := ""
-	// 1. query the Get URL of an property
+	// 1. query the Get URL of a property
 	if !exist || (exist && oldAps.GetURL == "") {
-		commandRep, err := efc.GetCommandResponseByName(actualDeviceName)
+		coreCommands, err := efc.GetCommandResponseByName(actualDeviceName)
 		if err != nil {
 			return &devicev1alpha1.ActualPropertyState{}, err
 		}
-		for _, c := range commandRep.Commands {
-			if c.Name == propertyName {
-				propertyGetURL = c.Get.URL
+		for _, c := range coreCommands {
+			if c.Name == propertyName && c.Get {
+				propertyGetURL = fmt.Sprintf("%s%s", c.Url, c.Path)
 				break
 			}
 		}
 		if propertyGetURL == "" {
-			return nil, fmt.Errorf("this property %s is not exist", propertyName)
+			return nil, &edgeCli.NotFoundError{}
 		}
 	} else {
 		propertyGetURL = oldAps.GetURL
@@ -190,11 +190,11 @@ func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName
 	if resp, err := getPropertyState(propertyGetURL); err != nil {
 		return nil, err
 	} else {
-		var event models.Event
-		if err := json.Unmarshal(resp.Body(), &event); err != nil {
-			return &devicev1alpha1.ActualPropertyState{}, err
+		var eResp edgex_resp.EventResponse
+		if err := json.Unmarshal(resp.Body(), &eResp); err != nil {
+			return nil, err
 		}
-		actualPropertyState.ActualValue = getPropertyValueFromEvent(propertyName, event)
+		actualPropertyState.ActualValue = getPropertyValueFromEvent(propertyName, eResp.Event)
 	}
 	return &actualPropertyState, nil
 }
@@ -229,21 +229,20 @@ func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyN
 	dps := d.Spec.DeviceProperties[propertyName]
 	parameterName := dps.Name
 	if dps.PutURL == "" {
-		put, err := efc.getPropertyPut(acturalDeviceName, dps.Name)
+		putCmd, err := efc.getPropertyPut(acturalDeviceName, dps.Name)
 		if err != nil {
 			return err
 		}
-		dps.PutURL = put.URL
-		if len(put.ParameterNames) == 1 {
-			parameterName = put.ParameterNames[0]
+		dps.PutURL = fmt.Sprintf("%s%s", putCmd.Url, putCmd.Path)
+		if len(putCmd.Parameters) == 1 {
+			parameterName = putCmd.Parameters[0].ResourceName
 		}
-
 	}
 	// set the device property to desired state
 	bodyMap := make(map[string]string)
 	bodyMap[parameterName] = dps.DesiredValue
 	body, _ := json.Marshal(bodyMap)
-	klog.V(5).Infof("setting the property %s to desired value", "propertyName", parameterName, "desiredValue", string(body))
+	klog.V(5).Infof("setting the property to desired value", "propertyName", parameterName, "desiredValue", string(body))
 	rep, err := resty.New().R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(body).
@@ -263,97 +262,103 @@ func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyN
 }
 
 // Gets the models.Put from edgex foundry which is used to set the device property's value
-func (efc *EdgexDeviceClient) getPropertyPut(deviceName, cmdName string) (models.Put, error) {
-	cr, err := efc.GetCommandResponseByName(deviceName)
+func (efc *EdgexDeviceClient) getPropertyPut(deviceName, cmdName string) (dtos.CoreCommand, error) {
+	coreCommands, err := efc.GetCommandResponseByName(deviceName)
 	if err != nil {
-		return models.Put{}, err
+		return dtos.CoreCommand{}, err
 	}
-	for _, c := range cr.Commands {
-		if cmdName == c.Name {
-			return c.Put, nil
+	for _, c := range coreCommands {
+		if cmdName == c.Name && c.Set {
+			return c, nil
 		}
 	}
-	return models.Put{}, errors.New("corresponding command is not found")
+	return dtos.CoreCommand{}, errors.New("corresponding command is not found")
 }
 
 // ListPropertiesState gets all the actual property information about a device
-func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *devicev1alpha1.Device, options edgeCli.ListOptions) (map[string]devicev1alpha1.DesiredPropertyState, map[string]devicev1alpha1.ActualPropertyState, error) {
+func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *devicev1alpha1.Device, options edgeCli.ListOptions) (map[string]v1alpha1.DesiredPropertyState, map[string]devicev1alpha1.ActualPropertyState, error) {
 	actualDeviceName := getEdgeDeviceName(device)
 
-	dps := map[string]devicev1alpha1.DesiredPropertyState{}
-	aps := map[string]devicev1alpha1.ActualPropertyState{}
-	cr, err := efc.GetCommandResponseByName(actualDeviceName)
+	dpsm := map[string]devicev1alpha1.DesiredPropertyState{}
+	apsm := map[string]devicev1alpha1.ActualPropertyState{}
+	coreCommands, err := efc.GetCommandResponseByName(actualDeviceName)
 	if err != nil {
-		return dps, aps, err
+		return dpsm, apsm, err
 	}
 
-	for _, c := range cr.Commands {
+	for _, c := range coreCommands {
 		// DesiredPropertyState only store the basic information and does not set DesiredValue
-		resp, err := getPropertyState(c.Get.URL)
-		dps[c.Name] = devicev1alpha1.DesiredPropertyState{Name: c.Name, PutURL: c.Put.URL}
-		if err != nil {
-			aps[c.Name] = devicev1alpha1.ActualPropertyState{Name: c.Name, GetURL: c.Get.URL}
-			klog.V(5).ErrorS(err, "getPropertyState failed", "propertyName", c.Name, "deviceName", actualDeviceName)
-		} else {
-			var event models.Event
-			if err := json.Unmarshal(resp.Body(), &event); err != nil {
-				klog.V(5).ErrorS(err, "failed to decode the response ", "response", resp)
-				continue
+		if c.Get {
+			getURL := fmt.Sprintf("%s%s", c.Url, c.Path)
+			aps, ok := apsm[c.Name]
+			if ok {
+				aps.GetURL = getURL
+			} else {
+				aps = devicev1alpha1.ActualPropertyState{Name: c.Name, GetURL: getURL}
 			}
-			readingName := c.Name
-			getResp := c.Get.Responses
-			for _, it := range getResp {
-				if it.Code == "200" {
-					expectValues := it.ExpectedValues
-					if len(expectValues) == 1 {
-						readingName = expectValues[0]
-					}
+			apsm[c.Name] = aps
+			resp, err := getPropertyState(getURL)
+			if err != nil {
+				klog.V(5).ErrorS(err, "getPropertyState failed", "propertyName", c.Name, "deviceName", actualDeviceName)
+			} else {
+				var eResp edgex_resp.EventResponse
+				if err := json.Unmarshal(resp.Body(), &eResp); err != nil {
+					klog.V(5).ErrorS(err, "failed to decode the response ", "response", resp)
+					continue
 				}
+				event := eResp.Event
+				readingName := c.Name
+				expectParams := c.Parameters
+				if len(expectParams) == 1 {
+					readingName = expectParams[0].ResourceName
+				}
+				klog.V(5).Infof("get reading name %s for command %s of device %s", readingName, c.Name, device.Name)
+				actualValue := getPropertyValueFromEvent(readingName, event)
+				aps.ActualValue = actualValue
+				apsm[c.Name] = aps
 			}
-			klog.V(5).Infof("get reading name %s for command %s of device %s", readingName, c.Name, device.Name)
-			actualValue := getPropertyValueFromEvent(readingName, event)
-
-			aps[c.Name] = devicev1alpha1.ActualPropertyState{Name: c.Name, GetURL: c.Get.URL, ActualValue: actualValue}
 		}
 	}
-	return dps, aps, nil
+	return dpsm, apsm, nil
 }
 
 // The actual property value is resolved from the returned event
-func getPropertyValueFromEvent(propertyName string, modelEvent models.Event) string {
+func getPropertyValueFromEvent(resName string, event dtos.Event) string {
 	actualValue := ""
-	if len(modelEvent.Readings) == 1 {
-		if propertyName == modelEvent.Readings[0].Name {
-			actualValue = modelEvent.Readings[0].Value
-		}
-	} else {
-		for _, k := range modelEvent.Readings {
-			currentProperty := strings.Join([]string{k.Name, k.Value}, ":")
-			if actualValue == "" {
-				actualValue = currentProperty
-			} else {
-				actualValue = strings.Join([]string{actualValue, currentProperty}, ", ")
+	for _, r := range event.Readings {
+		if resName == r.ResourceName {
+			if r.SimpleReading.Value != "" {
+				actualValue = r.SimpleReading.Value
+			} else if len(r.BinaryReading.BinaryValue) != 0 {
+				// TODO: how to demonstrate binary data
+				actualValue = fmt.Sprintf("%s:%s", r.BinaryReading.MediaType, "blob value")
+			} else if r.ObjectReading.ObjectValue != nil {
+				serializedBytes, _ := json.Marshal(r.ObjectReading.ObjectValue)
+				actualValue = string(serializedBytes)
 			}
+			break
 		}
 	}
 	return actualValue
 }
 
 // GetCommandResponseByName gets all commands supported by the device
-func (efc *EdgexDeviceClient) GetCommandResponseByName(deviceName string) (
-	models.CommandResponse, error) {
+func (efc *EdgexDeviceClient) GetCommandResponseByName(deviceName string) ([]dtos.CoreCommand, error) {
 	klog.V(5).Infof("will get CommandResponses of device: %s", deviceName)
 
-	var vd models.CommandResponse
+	var dcr edgex_resp.DeviceCoreCommandResponse
 	getURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreCommandAddr, CommandResponsePath, deviceName)
 
 	resp, err := efc.R().Get(getURL)
 	if err != nil {
-		return vd, err
+		return nil, err
 	}
-	if strings.Contains(string(resp.Body()), "Item not found") {
-		return vd, errors.New("Item not found")
+	if resp.StatusCode() == http.StatusNotFound {
+		return nil, errors.New("Item not found")
 	}
-	err = json.Unmarshal(resp.Body(), &vd)
-	return vd, err
+	err = json.Unmarshal(resp.Body(), &dcr)
+	if err != nil {
+		return nil, err
+	}
+	return dcr.DeviceCoreCommand.CoreCommands, nil
 }

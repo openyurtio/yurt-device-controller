@@ -69,21 +69,11 @@ type DevicePropertyInterface interface {
 
 // DeviceServiceInterface defines the interfaces which used to create, delete, update, get and list DeviceService objects on edge-side platform
 type DeviceServiceInterface interface {
-	AddressableInterface
 	Create(ctx context.Context, deviceService *v1alpha1.DeviceService, options CreateOptions) (*v1alpha1.DeviceService, error)
 	Delete(ctx context.Context, name string, options DeleteOptions) error
 	Update(ctx context.Context, deviceService *v1alpha1.DeviceService, options UpdateOptions) (*v1alpha1.DeviceService, error)
 	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.DeviceService, error)
 	List(ctx context.Context, options ListOptions) ([]v1alpha1.DeviceService, error)
-}
-
-// AddressableInterface defines the interfaces which used to create, delete, update, get and list Addressable objects on edge-side platform
-type AddressableInterface interface {
-	CreateAddressable(ctx context.Context, addressable *v1alpha1.Addressable, options CreateOptions) (*v1alpha1.Addressable, error)
-	DeleteAddressable(ctx context.Context, name string, options DeleteOptions) error
-	UpdateAddressable(ctx context.Context, device *v1alpha1.Addressable, options UpdateOptions) (*v1alpha1.Addressable, error)
-	GetAddressable(ctx context.Context, name string, options GetOptions) (*v1alpha1.Addressable, error)
-	ListAddressables(ctx context.Context, options ListOptions) ([]v1alpha1.Addressable, error)
 }
 
 // DeviceProfileInterface defines the interfaces which used to create, delete, update, get and list DeviceProfile objects on edge-side platform
@@ -93,13 +83,4 @@ type DeviceProfileInterface interface {
 	Update(ctx context.Context, deviceProfile *v1alpha1.DeviceProfile, options UpdateOptions) (*v1alpha1.DeviceProfile, error)
 	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.DeviceProfile, error)
 	List(ctx context.Context, options ListOptions) ([]v1alpha1.DeviceProfile, error)
-}
-
-// ValueDescriptorInterface defines the interfaces which used to create, delete, update, get and list valueDescriptor objects on edge-side platform
-type ValueDescriptorInterface interface {
-	Create(ctx context.Context, valueDescriptor *v1alpha1.ValueDescriptor, options CreateOptions) (*v1alpha1.ValueDescriptor, error)
-	Delete(ctx context.Context, name string, options DeleteOptions) error
-	Update(ctx context.Context, valueDescriptor *v1alpha1.ValueDescriptor, options UpdateOptions) (*v1alpha1.ValueDescriptor, error)
-	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.ValueDescriptor, error)
-	List(ctx context.Context, options ListOptions) ([]v1alpha1.ValueDescriptor, error)
 }
