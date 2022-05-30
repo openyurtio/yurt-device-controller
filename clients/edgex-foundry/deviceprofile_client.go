@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
+
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
 
 	"github.com/go-resty/resty/v2"
@@ -89,22 +91,37 @@ func (cdc *EdgexDeviceProfile) Get(ctx context.Context, name string, opts devcli
 }
 
 func (cdc *EdgexDeviceProfile) Create(ctx context.Context, deviceProfile *v1alpha1.DeviceProfile, opts devcli.CreateOptions) (*v1alpha1.DeviceProfile, error) {
-	edgeDp := ToEdgeXDeviceProfile(deviceProfile)
-	dpJson, err := json.Marshal(edgeDp)
+	dps := []*v1alpha1.DeviceProfile{deviceProfile}
+	req := makeEdgeXDeviceProfilesRequest(dps)
+	klog.V(5).Infof("will add the DeviceProfile: %s", deviceProfile.Name)
+	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 	postURL := fmt.Sprintf("http://%s%s", cdc.CoreMetaAddr, DeviceProfilePath)
-	resp, err := cdc.R().SetBody(dpJson).Post(postURL)
+	resp, err := cdc.R().SetBody(reqBody).Post(postURL)
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode() != http.StatusOK {
+	if resp.StatusCode() != http.StatusMultiStatus {
 		return nil, fmt.Errorf("create edgex deviceProfile err: %s", string(resp.Body())) // 假定 resp.Body() 存了 msg 信息
 	}
-	deviceProfile.Status.EdgeId = string(resp.Body())
-	deviceProfile.Status.Synced = true
-	return deviceProfile, err
+	var edgexResps []*common.BaseWithIdResponse
+	if err = json.Unmarshal(resp.Body(), &edgexResps); err != nil {
+		return nil, err
+	}
+	createdDeviceProfile := deviceProfile.DeepCopy()
+	if len(edgexResps) == 1 {
+		if edgexResps[0].StatusCode == http.StatusCreated {
+			createdDeviceProfile.Status.EdgeId = edgexResps[0].Id
+			createdDeviceProfile.Status.Synced = true
+		} else {
+			return nil, fmt.Errorf("create deviceprofile on edgex foundry failed, the response is : %s", resp.Body())
+		}
+	} else {
+		return nil, fmt.Errorf("edgex BaseWithIdResponse count mismatch DeviceProfile count, the response is : %s", resp.Body())
+	}
+	return createdDeviceProfile, err
 }
 
 // TODO: edgex does not support update DeviceProfile

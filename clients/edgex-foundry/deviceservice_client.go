@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
+
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
 
 	"github.com/go-resty/resty/v2"
@@ -45,24 +47,39 @@ func NewEdgexDeviceServiceClient(coreMetaAddr string) *EdgexDeviceServiceClient 
 }
 
 // Create function sends a POST request to EdgeX to add a new deviceService
-func (eds *EdgexDeviceServiceClient) Create(ctx context.Context, deviceservice *v1alpha1.DeviceService, options edgeCli.CreateOptions) (*v1alpha1.DeviceService, error) {
-	ds := toEdgexDeviceService(deviceservice)
-	klog.V(5).InfoS("will add the DeviceServices", "DeviceService", ds.Name)
-	dpJson, err := json.Marshal(&ds)
+func (eds *EdgexDeviceServiceClient) Create(ctx context.Context, deviceService *v1alpha1.DeviceService, options edgeCli.CreateOptions) (*v1alpha1.DeviceService, error) {
+	dss := []*v1alpha1.DeviceService{deviceService}
+	req := makeEdgeXDeviceService(dss)
+	klog.V(5).InfoS("will add the DeviceServices", "DeviceService", deviceService.Name)
+	jsonBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 	postPath := fmt.Sprintf("http://%s%s", eds.CoreMetaAddr, DeviceServicePath)
 	resp, err := eds.R().
-		SetBody(dpJson).Post(postPath)
+		SetBody(jsonBody).Post(postPath)
 	if err != nil {
 		return nil, err
-	} else if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("create deviceService on edgex foundry failed, the response is : %s", resp.Body())
+	} else if resp.StatusCode() != http.StatusMultiStatus {
+		return nil, fmt.Errorf("create DeviceService on edgex foundry failed, the response is : %s", resp.Body())
 	}
-	createdDs := deviceservice.DeepCopy()
-	createdDs.Status.EdgeId = string(resp.Body())
-	return createdDs, err
+
+	var edgexResps []*common.BaseWithIdResponse
+	if err = json.Unmarshal(resp.Body(), &edgexResps); err != nil {
+		return nil, err
+	}
+	createdDeviceService := deviceService.DeepCopy()
+	if len(edgexResps) == 1 {
+		if edgexResps[0].StatusCode == http.StatusCreated {
+			createdDeviceService.Status.EdgeId = edgexResps[0].Id
+			createdDeviceService.Status.Synced = true
+		} else {
+			return nil, fmt.Errorf("create DeviceService on edgex foundry failed, the response is : %s", resp.Body())
+		}
+	} else {
+		return nil, fmt.Errorf("edgex BaseWithIdResponse count mismatch DeviceService count, the response is : %s", resp.Body())
+	}
+	return createdDeviceService, err
 }
 
 // Delete function sends a request to EdgeX to delete a deviceService

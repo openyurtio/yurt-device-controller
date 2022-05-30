@@ -176,7 +176,7 @@ func (r *DeviceServiceReconciler) reconcileCreateDeviceService(ctx context.Conte
 				return fmt.Errorf("fail to add DeviceService to edge platform: %v", err)
 			}
 
-			klog.V(4).InfoS("Successfully add DeviceService to Edge Platform, Name: %s, EdgeId: %s", ds.GetName(), createdDs.Status.EdgeId)
+			klog.V(4).Infof("Successfully add DeviceService to Edge Platform, Name: %s, EdgeId: %s", ds.GetName(), createdDs.Status.EdgeId)
 			ds.Status.EdgeId = createdDs.Status.EdgeId
 			ds.Status.Synced = true
 			conditions.MarkTrue(ds, devicev1alpha1.DeviceServiceSyncedCondition)
