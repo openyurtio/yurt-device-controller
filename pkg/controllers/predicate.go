@@ -17,11 +17,11 @@ limitations under the License.
 package controllers
 
 import (
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 )
 
 func genFirstUpdateFilter(objKind string) predicate.Predicate {

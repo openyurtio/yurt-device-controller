@@ -21,26 +21,25 @@ import (
 	"encoding/json"
 	"fmt"
 
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
+	"github.com/openyurtio/device-controller/pkg/clients"
+	edgexclis "github.com/openyurtio/device-controller/pkg/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/pkg/controllers/util"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
-	clis "github.com/openyurtio/device-controller/clients"
-	devcli "github.com/openyurtio/device-controller/clients"
-	edgexclis "github.com/openyurtio/device-controller/clients/edgex-foundry"
-	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
-	"github.com/openyurtio/device-controller/controllers/util"
 )
 
 // DeviceProfileReconciler reconciles a DeviceProfile object
 type DeviceProfileReconciler struct {
 	client.Client
 	Scheme     *runtime.Scheme
-	edgeClient devcli.DeviceProfileInterface
+	edgeClient clients.DeviceProfileInterface
 	NodePool   string
 }
 
@@ -128,8 +127,8 @@ func (r *DeviceProfileReconciler) reconcileDeleteDeviceProfile(ctx context.Conte
 		}
 
 		// delete the deviceProfile object on edge platform
-		err := r.edgeClient.Delete(nil, actualName, devcli.DeleteOptions{})
-		if err != nil && !clis.IsNotFoundErr(err) {
+		err := r.edgeClient.Delete(nil, actualName, clients.DeleteOptions{})
+		if err != nil && !clients.IsNotFoundErr(err) {
 			return err
 		}
 	}
@@ -138,8 +137,8 @@ func (r *DeviceProfileReconciler) reconcileDeleteDeviceProfile(ctx context.Conte
 
 func (r *DeviceProfileReconciler) reconcileCreateDeviceProfile(ctx context.Context, dp *devicev1alpha1.DeviceProfile, actualName string) error {
 	klog.V(4).Infof("Checking if deviceProfile already exist on the edge platform: %s", dp.GetName())
-	if edgeDp, err := r.edgeClient.Get(nil, actualName, devcli.GetOptions{}); err != nil {
-		if !clis.IsNotFoundErr(err) {
+	if edgeDp, err := r.edgeClient.Get(nil, actualName, clients.GetOptions{}); err != nil {
+		if !clients.IsNotFoundErr(err) {
 			klog.V(4).ErrorS(err, "fail to visit the edge platform")
 			return nil
 		}
@@ -152,7 +151,7 @@ func (r *DeviceProfileReconciler) reconcileCreateDeviceProfile(ctx context.Conte
 	}
 
 	// b. If object does not exist, a request is sent to the edge platform to create a new deviceProfile
-	createDp, err := r.edgeClient.Create(context.Background(), dp, devcli.CreateOptions{})
+	createDp, err := r.edgeClient.Create(context.Background(), dp, clients.CreateOptions{})
 	if err != nil {
 		klog.V(4).ErrorS(err, "failed to create deviceProfile on edge platform")
 		return fmt.Errorf("failed to add deviceProfile to edge platform: %v", err)

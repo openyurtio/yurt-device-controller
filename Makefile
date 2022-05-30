@@ -17,8 +17,8 @@ all: manager
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 test: generate fmt vet manifests
 	mkdir -p ${ENVTEST_ASSETS_DIR}
-	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
-	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
+	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.8.3/hack/setup-envtest.sh
+	/bin/bash -c "source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out"
 
 # Build binaries
 # ARGS:
@@ -100,10 +100,10 @@ vet:
 generate: controller-gen
 	go generate ./...
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" \
-		paths="./api/v1alpha1/device_types.go" \
-		paths="./api/v1alpha1/deviceservice_types.go" \
-		paths="./api/v1alpha1/deviceprofile_types.go" \
-		paths="./api/v1alpha1/groupversion_info.go"
+		paths="./apis/device.openyurt.io/v1alpha1/device_types.go" \
+		paths="./apis/device.openyurt.io/v1alpha1/deviceservice_types.go" \
+		paths="./apis/device.openyurt.io/v1alpha1/deviceprofile_types.go" \
+		paths="./apis/device.openyurt.io/v1alpha1/groupversion_info.go"
 
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
@@ -124,7 +124,7 @@ TMP_DIR=$$(mktemp -d) ;\
 cd $$TMP_DIR ;\
 go mod init tmp ;\
 echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef

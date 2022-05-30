@@ -20,9 +20,9 @@ import (
 	"context"
 	"sync"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
 
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -35,24 +35,24 @@ func RegisterFieldIndexers(fi client.FieldIndexer) error {
 	var err error
 	registerOnce.Do(func() {
 		// register the fieldIndexer for device
-		if err = fi.IndexField(context.TODO(), &devicev1alpha1.Device{}, IndexerPathForNodepool, func(rawObj client.Object) []string {
-			device := rawObj.(*devicev1alpha1.Device)
+		if err = fi.IndexField(context.TODO(), &v1alpha1.Device{}, IndexerPathForNodepool, func(rawObj client.Object) []string {
+			device := rawObj.(*v1alpha1.Device)
 			return []string{device.Spec.NodePool}
 		}); err != nil {
 			return
 		}
 
 		// register the fieldIndexer for deviceService
-		if err = fi.IndexField(context.TODO(), &devicev1alpha1.DeviceService{}, IndexerPathForNodepool, func(rawObj client.Object) []string {
-			deviceService := rawObj.(*devicev1alpha1.DeviceService)
+		if err = fi.IndexField(context.TODO(), &v1alpha1.DeviceService{}, IndexerPathForNodepool, func(rawObj client.Object) []string {
+			deviceService := rawObj.(*v1alpha1.DeviceService)
 			return []string{deviceService.Spec.NodePool}
 		}); err != nil {
 			return
 		}
 
 		// register the fieldIndexer for deviceProfile
-		if err = fi.IndexField(context.TODO(), &devicev1alpha1.DeviceProfile{}, IndexerPathForNodepool, func(rawObj client.Object) []string {
-			profile := rawObj.(*devicev1alpha1.DeviceProfile)
+		if err = fi.IndexField(context.TODO(), &v1alpha1.DeviceProfile{}, IndexerPathForNodepool, func(rawObj client.Object) []string {
+			profile := rawObj.(*v1alpha1.DeviceProfile)
 			return []string{profile.Spec.NodePool}
 		}); err != nil {
 			return

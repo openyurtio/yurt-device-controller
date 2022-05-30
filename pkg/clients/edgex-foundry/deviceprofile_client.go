@@ -22,15 +22,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
+	"github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+	devcli "github.com/openyurtio/device-controller/pkg/clients"
 
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
 
 	"github.com/go-resty/resty/v2"
 	"k8s.io/klog/v2"
-
-	"github.com/openyurtio/device-controller/api/v1alpha1"
-	devcli "github.com/openyurtio/device-controller/clients"
 )
 
 type EdgexDeviceProfile struct {
@@ -45,7 +44,7 @@ func NewEdgexDeviceProfile(coreMetaAddr string) *EdgexDeviceProfile {
 	}
 }
 
-//TODO: support label filtering
+// TODO: support label filtering
 func getListDeviceProfileURL(address string, opts devcli.ListOptions) (string, error) {
 	url := fmt.Sprintf("http://%s%s/all?limit=-1", address, DeviceProfilePath)
 	return url, nil

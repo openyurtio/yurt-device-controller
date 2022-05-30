@@ -89,8 +89,9 @@ spec:
                 items:
                   properties:
                     attributes:
+                      additionalProperties:
+                        type: string
                       type: object
-                      x-kubernetes-preserve-unknown-fields: true
                     description:
                       type: string
                     isHidden:
@@ -125,8 +126,6 @@ spec:
                           type: string
                         valueType:
                           type: string
-                      required:
-                      - valueType
                       type: object
                     tag:
                       type: string
