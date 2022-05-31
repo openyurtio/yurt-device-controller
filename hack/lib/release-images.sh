@@ -33,11 +33,12 @@ readonly region=${REGION:-us}
 readonly image_base_name="${REPO}/${bin_target}:${TAG}"
 
 build_multi_arch_binaries() {
+    local docker_yurt_root="/opt/src"
     local docker_run_opts=(
         "-i"
         "--rm"
         "--network host"
-        "-v ${YURT_ROOT}:/opt/src"
+        "-v ${YURT_ROOT}:${docker_yurt_root}"
         "--env CGO_ENABLED=0"
         "--env GOOS=${SUPPORTED_OS}"
         "--env PROJECT_PREFIX=${PROJECT_PREFIX}"
@@ -49,6 +50,10 @@ build_multi_arch_binaries() {
     # use goproxy if build from inside mainland China
     [[ $region == "cn" ]] && docker_run_opts+=("--env GOPROXY=https://goproxy.cn")
 
+    # use proxy if set
+    [[ -n ${http_proxy+x} ]] && docker_run_opts+=("--env http_proxy=${http_proxy}")
+    [[ -n ${https_proxy+x} ]] && docker_run_opts+=("--env https_proxy=${https_proxy}")
+
     local docker_run_cmd=(
         "/bin/sh"
         "-xe"
@@ -57,13 +62,14 @@ build_multi_arch_binaries() {
 
     local sub_commands="sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; \
         apk --no-cache add bash git; \
-        cd /opt/src; umask 0022; \
-        rm -rf ${YURT_BIN_DIR}/* ;"
+        cd ${docker_yurt_root}; umask 0022; \
+        rm -rf ${YURT_BIN_DIR}/* ; \
+	git config --global --add safe.directory ${docker_yurt_root};"
 
     for arch in ${target_arch[@]}; do
       sub_commands+="GOARCH=$arch bash ./hack/make-rules/build.sh ${bin_target}; "
     done
-    sub_commands+="chown -R $(id -u):$(id -g) /opt/src/_output"
+    sub_commands+="chown -R $(id -u):$(id -g) ${docker_yurt_root}/_output"
 
     docker run ${docker_run_opts[@]} ${YURT_BUILD_IMAGE} ${docker_run_cmd[@]} "${sub_commands}"
 }
