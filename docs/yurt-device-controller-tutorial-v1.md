@@ -1,6 +1,8 @@
+Caution: This tutorial is dedicated for OpenYurt and EdgeX Foundry 1.x, for OpenYurt with EdgeX Foundry 2.x, please refer to [tutorial](https://github.com/openyurtio/yurt-device-controller/blob/main/docs/yurt-device-controller-tutorial-v2.md)
+
 # Yurt-device-controller Tutorial
 
-This document introduces how to install yurt-device-controller and use yurt-device-controller to manage edge devices on edgex foundry. Suppose you have an OpenYurt cluster, and already have one edgex foundry instance in a NodePool.
+This document introduces how to install yurt-device-controller and use yurt-device-controller to manage edge devices on EdgeX Foundry V1. We suppose you have an OpenYurt cluster, and already have one EdgeX Foundry V1 instance deployed in a NodePool.
 
 ## Environment
 
@@ -12,7 +14,7 @@ This document introduces how to install yurt-device-controller and use yurt-devi
 
 ## Install yurt-device-controller
 
-Suppose you have an OpenYurt cluster, a nodePool, and deployed an Edgex Foundry Instance on that node pool.
+Suppose you have an OpenYurt cluster, a nodePool, and deployed an EdgeX Foundry Instance on that node pool.
 
 ### Install the related CRDs
 
@@ -21,7 +23,7 @@ $ cd yurt-device-controller
 $ kubectl apply -f config/setup/crd.yaml
 ```
 
-### Deploy yurt-device-controller by using unitedDeployment
+### Deploy yurt-device-controller using UnitedDeployment
 
 The following unitedDeployment example deploy a yurt-device-controller in hangzhou nodePool:
 
@@ -465,30 +467,4 @@ The following operation uses `random-boolean-device` device, which is automatica
 
    $ curl http://10.96.39.34:48082/api/v1/device/07b0d343-cc07-43ff-afb1-6a2792d48b7f/command/9a61a8d5-7c15-4d1b-b552-15b7879d9fc8
    {"device":"random-boolean-device","origin":1632378327952106491,"readings":[{"origin":1632378327951971484,"device":"random-boolean-device","name":"Bool","value":"false","valueType":"Bool"}],"EncodedEvent":null}
-   ```
-
-## Make binary or image
-
-1. User can build the binary for local testing, golang v1.15+ is required. The generated binary file is in path `~/yurt-device-controller/_output/bin/$(go env GOOS)/$(go env GOARCH)/yurt-device-controller`
-   ```bash
-   $ cd yurt-device-controller
-   # ARGS:
-   #   GOOS: the target operating system (i.e., linux, darwin)
-   #   GOARCH: the target architecture (i.e., amd64, arm64, arm)
-   $ make build GOOS=linux GOARCH=amd64
-   ```
-2. User can build image for local testing, docker environment are required.
-   ```bash
-   $ cd yurt-device-controller
-   # ARGS:
-   #   REPO: image repo
-   #   TAG:  image tag
-   #   ARCH: list of target architectures.
-   #   REGION: in which region this rule is executed, if in mainland China, set it as cn.
-   $ make release REPO=openyurt TAG=latest ARCH="amd64 arm64 arm" REGION=cn
-   ```
-3. Clear the compiled files
-   ```bash
-   $ cd yurt-device-controller
-   $ make clean
    ```
