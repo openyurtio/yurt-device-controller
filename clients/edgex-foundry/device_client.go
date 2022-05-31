@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
+
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos"
 
 	edgex_resp "github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
@@ -54,23 +56,37 @@ func NewEdgexDeviceClient(coreMetaAddr, coreCommandAddr string) *EdgexDeviceClie
 
 // Create function sends a POST request to EdgeX to add a new device
 func (efc *EdgexDeviceClient) Create(ctx context.Context, device *devicev1alpha1.Device, options edgeCli.CreateOptions) (*devicev1alpha1.Device, error) {
-	dp := toEdgeXDevice(device)
-	klog.V(5).Infof("will add the Devices: %s", dp.Name)
-	dpJson, err := json.Marshal(&dp)
+	devs := []*devicev1alpha1.Device{device}
+	req := makeEdgeXDeviceRequest(devs)
+	klog.V(5).Infof("will add the Device: %s", device.Name)
+	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 	postPath := fmt.Sprintf("http://%s%s", efc.CoreMetaAddr, DevicePath)
 	resp, err := efc.R().
-		SetBody(dpJson).Post(postPath)
+		SetBody(reqBody).Post(postPath)
 	if err != nil {
 		return nil, err
-	} else if resp.StatusCode() != http.StatusOK {
+	} else if resp.StatusCode() != http.StatusMultiStatus {
 		return nil, fmt.Errorf("create device on edgex foundry failed, the response is : %s", resp.Body())
 	}
 
+	var edgexResps []*common.BaseWithIdResponse
+	if err = json.Unmarshal(resp.Body(), &edgexResps); err != nil {
+		return nil, err
+	}
 	createdDevice := device.DeepCopy()
-	createdDevice.Status.EdgeId = string(resp.Body())
+	if len(edgexResps) == 1 {
+		if edgexResps[0].StatusCode == http.StatusCreated {
+			createdDevice.Status.EdgeId = edgexResps[0].Id
+			createdDevice.Status.Synced = true
+		} else {
+			return nil, fmt.Errorf("create device on edgex foundry failed, the response is : %s", resp.Body())
+		}
+	} else {
+		return nil, fmt.Errorf("edgex BaseWithIdResponse count mismatch device cound, the response is : %s", resp.Body())
+	}
 	return createdDevice, err
 }
 

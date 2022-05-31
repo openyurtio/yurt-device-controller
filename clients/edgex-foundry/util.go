@@ -19,8 +19,10 @@ package edgex_foundry
 import (
 	"strings"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos"
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
 
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos"
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/requests"
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/models"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -33,6 +35,8 @@ const (
 	DeviceProfilePath   = "/api/v2/deviceprofile"
 	DevicePath          = "/api/v2/device"
 	CommandResponsePath = "/api/v2/device"
+
+	APIVersionV2 = "v2"
 )
 
 type ClientURL struct {
@@ -50,29 +54,28 @@ func getEdgeDeviceName(d *devicev1alpha1.Device) string {
 	return actualDeviceName
 }
 
-func toEdgexDeviceService(ds *devicev1alpha1.DeviceService) models.DeviceService {
-	return models.DeviceService{
-		Description: ds.Spec.Description,
-		Name:        ds.GetName(),
-		//Id:             ds.Spec.Id,
+func toEdgexDeviceService(ds *devicev1alpha1.DeviceService) dtos.DeviceService {
+	return dtos.DeviceService{
+		Description:   ds.Spec.Description,
+		Name:          ds.GetName(),
 		LastConnected: ds.Status.LastConnected,
 		LastReported:  ds.Status.LastReported,
 		Labels:        ds.Spec.Labels,
-		AdminState:    models.AdminState(ds.Spec.AdminState),
+		AdminState:    string(ds.Spec.AdminState),
 		BaseAddress:   ds.Spec.BaseAddress,
 	}
 }
 
-func toEdgeXDeviceResourceSlice(drs []devicev1alpha1.DeviceResource) []models.DeviceResource {
-	var ret []models.DeviceResource
+func toEdgeXDeviceResourceSlice(drs []devicev1alpha1.DeviceResource) []dtos.DeviceResource {
+	var ret []dtos.DeviceResource
 	for _, dr := range drs {
 		ret = append(ret, toEdgeXDeviceResource(dr))
 	}
 	return ret
 }
 
-func toEdgeXDeviceResource(dr devicev1alpha1.DeviceResource) models.DeviceResource {
-	return models.DeviceResource{
+func toEdgeXDeviceResource(dr devicev1alpha1.DeviceResource) dtos.DeviceResource {
+	return dtos.DeviceResource{
 		Description: dr.Description,
 		Name:        dr.Name,
 		Tag:         dr.Tag,
@@ -81,8 +84,8 @@ func toEdgeXDeviceResource(dr devicev1alpha1.DeviceResource) models.DeviceResour
 	}
 }
 
-func toEdgeXProfileProperty(pp devicev1alpha1.ResourceProperties) models.ResourceProperties {
-	return models.ResourceProperties{
+func toEdgeXProfileProperty(pp devicev1alpha1.ResourceProperties) dtos.ResourceProperties {
+	return dtos.ResourceProperties{
 		ReadWrite:    pp.ReadWrite,
 		Minimum:      pp.Minimum,
 		Maximum:      pp.Maximum,
@@ -123,12 +126,12 @@ func toKubeDeviceService(ds dtos.DeviceService) devicev1alpha1.DeviceService {
 	}
 }
 
-func toEdgeXDevice(d *devicev1alpha1.Device) models.Device {
-	md := models.Device{
+func toEdgeXDevice(d *devicev1alpha1.Device) dtos.Device {
+	md := dtos.Device{
 		Description:    d.Spec.Description,
 		Name:           d.GetName(),
-		AdminState:     toEdgeXAdminState(d.Spec.AdminState),
-		OperatingState: toEdgeXOperatingState(d.Spec.OperatingState),
+		AdminState:     string(toEdgeXAdminState(d.Spec.AdminState)),
+		OperatingState: string(toEdgeXOperatingState(d.Spec.OperatingState)),
 		Protocols:      toEdgeXProtocols(d.Spec.Protocols),
 		LastConnected:  d.Status.LastConnected,
 		LastReported:   d.Status.LastReported,
@@ -136,7 +139,6 @@ func toEdgeXDevice(d *devicev1alpha1.Device) models.Device {
 		Location:       d.Spec.Location,
 		ServiceName:    d.Spec.Service,
 		ProfileName:    d.Spec.Profile,
-		Notify:         d.Spec.Notify,
 	}
 	if d.Status.EdgeId != "" {
 		md.Id = d.Status.EdgeId
@@ -145,10 +147,10 @@ func toEdgeXDevice(d *devicev1alpha1.Device) models.Device {
 }
 
 func toEdgeXProtocols(
-	pps map[string]devicev1alpha1.ProtocolProperties) map[string]models.ProtocolProperties {
-	ret := map[string]models.ProtocolProperties{}
+	pps map[string]devicev1alpha1.ProtocolProperties) map[string]dtos.ProtocolProperties {
+	ret := map[string]dtos.ProtocolProperties{}
 	for k, v := range pps {
-		ret[k] = models.ProtocolProperties(v)
+		ret[k] = dtos.ProtocolProperties(v)
 	}
 	return ret
 }
@@ -254,10 +256,10 @@ func toKubeDeviceCommand(dcs []dtos.DeviceCommand) []devicev1alpha1.DeviceComman
 	return ret
 }
 
-func toEdgeXDeviceCommand(dcs []devicev1alpha1.DeviceCommand) []models.DeviceCommand {
-	var ret []models.DeviceCommand
+func toEdgeXDeviceCommand(dcs []devicev1alpha1.DeviceCommand) []dtos.DeviceCommand {
+	var ret []dtos.DeviceCommand
 	for _, dc := range dcs {
-		ret = append(ret, models.DeviceCommand{
+		ret = append(ret, dtos.DeviceCommand{
 			Name:               dc.Name,
 			ReadWrite:          dc.ReadWrite,
 			IsHidden:           dc.IsHidden,
@@ -279,10 +281,10 @@ func toKubeResourceOperations(ros []dtos.ResourceOperation) []devicev1alpha1.Res
 	return ret
 }
 
-func toEdgeXResourceOperations(ros []devicev1alpha1.ResourceOperation) []models.ResourceOperation {
-	var ret []models.ResourceOperation
+func toEdgeXResourceOperations(ros []devicev1alpha1.ResourceOperation) []dtos.ResourceOperation {
+	var ret []dtos.ResourceOperation
 	for _, ro := range ros {
-		ret = append(ret, models.ResourceOperation{
+		ret = append(ret, dtos.ResourceOperation{
 			DeviceResource: ro.DeviceResource,
 			Mappings:       ro.Mappings,
 			DefaultValue:   ro.DefaultValue,
@@ -328,9 +330,9 @@ func toKubeProfileProperty(rp dtos.ResourceProperties) devicev1alpha1.ResourcePr
 	}
 }
 
-// ToEdgeXDeviceProfile create DeviceProfile in edge according to devicProfile in cloud
-func ToEdgeXDeviceProfile(dp *devicev1alpha1.DeviceProfile) *models.DeviceProfile {
-	return &models.DeviceProfile{
+// toEdgeXDeviceProfile create DeviceProfile in edge according to devicProfile in cloud
+func toEdgeXDeviceProfile(dp *devicev1alpha1.DeviceProfile) dtos.DeviceProfile {
+	return dtos.DeviceProfile{
 		Description:     dp.Spec.Description,
 		Name:            dp.GetName(),
 		Manufacturer:    dp.Spec.Manufacturer,
@@ -339,4 +341,49 @@ func ToEdgeXDeviceProfile(dp *devicev1alpha1.DeviceProfile) *models.DeviceProfil
 		DeviceResources: toEdgeXDeviceResourceSlice(dp.Spec.DeviceResources),
 		DeviceCommands:  toEdgeXDeviceCommand(dp.Spec.DeviceCommands),
 	}
+}
+
+func makeEdgeXDeviceProfilesRequest(dps []*devicev1alpha1.DeviceProfile) []*requests.DeviceProfileRequest {
+	var req []*requests.DeviceProfileRequest
+	for _, dp := range dps {
+		req = append(req, &requests.DeviceProfileRequest{
+			BaseRequest: common.BaseRequest{
+				Versionable: common.Versionable{
+					ApiVersion: APIVersionV2,
+				},
+			},
+			Profile: toEdgeXDeviceProfile(dp),
+		})
+	}
+	return req
+}
+
+func makeEdgeXDeviceRequest(devs []*devicev1alpha1.Device) []*requests.AddDeviceRequest {
+	var req []*requests.AddDeviceRequest
+	for _, dev := range devs {
+		req = append(req, &requests.AddDeviceRequest{
+			BaseRequest: common.BaseRequest{
+				Versionable: common.Versionable{
+					ApiVersion: APIVersionV2,
+				},
+			},
+			Device: toEdgeXDevice(dev),
+		})
+	}
+	return req
+}
+
+func makeEdgeXDeviceService(dss []*devicev1alpha1.DeviceService) []*requests.AddDeviceServiceRequest {
+	var req []*requests.AddDeviceServiceRequest
+	for _, ds := range dss {
+		req = append(req, &requests.AddDeviceServiceRequest{
+			BaseRequest: common.BaseRequest{
+				Versionable: common.Versionable{
+					ApiVersion: APIVersionV2,
+				},
+			},
+			Service: toEdgexDeviceService(ds),
+		})
+	}
+	return req
 }
