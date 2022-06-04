@@ -32,7 +32,7 @@ To use the yurt-device-controller, you need to deploy the OpenYurt cluster in ad
 - Deploy the yurt-app-manager, the details of yurt-app-manager are in [here](https://github.com/openyurtio/yurt-app-manager) ；
 - Deploy an Edgex Foundry instance in a NodePool by using yurt-edgex-manager, the details of yurt-edgex-manager are in [here](https://github.com/openyurtio/yurt-edgex-manager) .
 
-For a complete example, please check out the [tutorial](docs/yurt-device-controller-tutorial.md)
+For a complete example, please check out the [tutorial](docs/yurt-device-controller-tutorial-v2.md)
 
 ## Contributing
 
