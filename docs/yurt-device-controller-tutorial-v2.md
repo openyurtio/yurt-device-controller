@@ -133,7 +133,7 @@ subjects:
   namespace: default
 ```
 
-You may notice yurt-device-controller has "args" specified in the above deployment file. For the full list of command
+You may notice yurt-device-controller has "args" specified in the deployment file above. For the full list of command
 line arguments yurt-device-controller supports, pls. check the section of [Reference](#reference) below.
 
 ## How to use
