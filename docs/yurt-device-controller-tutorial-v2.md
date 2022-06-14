@@ -78,6 +78,7 @@ spec:
               - --health-probe-bind-address=:8081
               - --metrics-bind-address=127.0.0.1:8080
               - --leader-elect=false
+              - --namespace=default
               - --v=5
               command:
               - /yurt-device-controller
@@ -131,6 +132,9 @@ subjects:
   name: default
   namespace: default
 ```
+
+You may notice yurt-device-controller has "args" specified in the above deployment file. For the full list of command
+line arguments yurt-device-controller supports, pls. check the section of [Reference](#reference) below.
 
 ## How to use
 
@@ -465,3 +469,20 @@ deviceservice.device.openyurt.io "openyurt-created-deviceservice-virtual" delete
 $ kubectl delete deviceprofile openyurt-created-random-boolean-deviceprofile
 deviceprofile.device.openyurt.io "openyurt-created-random-boolean-deviceprofile" deleted
 ```
+
+## Reference
+
+Command line arguments supported by yurt-device-controller:
+
+| Arguments                 | Usage                                                                                     | Default Value               |
+|---------------------------|-------------------------------------------------------------------------------------------|-----------------------------|
+| metrics-bind-address      | The address the metric endpoint binds to.                                                 |                             |
+| health-probe-bind-address | The address the probe endpoint binds to.                                                  | `:8081`                     |
+| leader-elect              | Enable leader election for controller manager.                                            | `false`                     |
+| nodepool                  | The nodePool deviceController is deployed in.(just for debugging)                         |                             |
+| namespace                 | The cluster namespace for edge resources synchronization.                                 | `default`                   |
+| core-data-address         | The address of edge core-data service.                                                    | `edgex-core-data:59880`     |
+| core-metadata-address     | The address of edge core-metadata service.                                                | `edgex-core-metadata:59881` |
+| core-command-address      | The address of edge core-command service.                                                 | `edgex-core-command:59882`  |
+| edge-sync-period          | The period of the device management platform synchronizing the device status to the cloud | `5`                         |
+
