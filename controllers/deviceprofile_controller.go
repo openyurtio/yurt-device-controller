@@ -18,15 +18,14 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	clis "github.com/openyurtio/device-controller/clients"
@@ -50,8 +49,8 @@ type DeviceProfileReconciler struct {
 
 // Reconcile make changes to a deviceprofile object in EdgeX based on it in Kubernetes
 func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var dp devicev1alpha1.DeviceProfile
-	if err := r.Get(ctx, req.NamespacedName, &dp); err != nil {
+	var dp *devicev1alpha1.DeviceProfile
+	if err := r.Get(ctx, req.NamespacedName, dp); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if dp.Spec.NodePool != r.NodePool {
@@ -60,18 +59,33 @@ func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	klog.V(3).Infof("Reconciling the DeviceProfile: %s", dp.GetName())
 
 	// gets the actual name of deviceProfile on the edge platform from the Label of the deviceProfile
-	dpActualName := util.GetEdgeDeviceProfileName(&dp, EdgeXObjectName)
+	dpActualName := util.GetEdgeDeviceProfileName(dp, EdgeXObjectName)
 
 	// 1. Handle the deviceProfile deletion event
-	if err := r.reconcileDeleteDeviceProfile(ctx, &dp, dpActualName); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	} else if !dp.ObjectMeta.DeletionTimestamp.IsZero() {
+	if dp.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(dp, devicev1alpha1.DeviceProfileFinalizer) {
+			controllerutil.AddFinalizer(dp, devicev1alpha1.DeviceProfileFinalizer)
+			if err := r.Update(ctx, dp); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		if controllerutil.ContainsFinalizer(dp, devicev1alpha1.DeviceProfileFinalizer) {
+			// delete the deviceProfile object on edge platform
+			if err := r.edgeClient.Delete(ctx, dpActualName, devcli.DeleteOptions{}); err != nil {
+				return ctrl.Result{}, err
+			}
+			controllerutil.RemoveFinalizer(dp, devicev1alpha1.DeviceProfileFinalizer)
+			if err := r.Update(ctx, dp); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 
 	if dp.Status.Synced == false {
 		// 2. Synchronize OpenYurt deviceProfile to edge platform
-		if err := r.reconcileCreateDeviceProfile(ctx, &dp, dpActualName); err != nil {
+		if err := r.reconcileCreateDeviceProfile(ctx, dp, dpActualName); err != nil {
 			if apierrors.IsConflict(err) {
 				return ctrl.Result{Requeue: true}, nil
 			} else {
@@ -94,46 +108,6 @@ func (r *DeviceProfileReconciler) SetupWithManager(mgr ctrl.Manager, opts *optio
 		For(&devicev1alpha1.DeviceProfile{}).
 		WithEventFilter(genFirstUpdateFilter("deviceprofile")).
 		Complete(r)
-}
-
-func (r *DeviceProfileReconciler) reconcileDeleteDeviceProfile(ctx context.Context, dp *devicev1alpha1.DeviceProfile, actualName string) error {
-	if dp.ObjectMeta.DeletionTimestamp.IsZero() {
-		if len(dp.GetFinalizers()) == 0 {
-			patchString := map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"finalizers": []string{devicev1alpha1.DeviceProfileFinalizer},
-				},
-			}
-			if patchData, err := json.Marshal(patchString); err != nil {
-				return err
-			} else {
-				if err = r.Patch(ctx, dp, client.RawPatch(types.MergePatchType, patchData)); err != nil {
-					return err
-				}
-			}
-		}
-	} else {
-		patchString := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"finalizers": []string{},
-			},
-		}
-		// delete the deviceProfile in OpenYurt
-		if patchData, err := json.Marshal(patchString); err != nil {
-			return err
-		} else {
-			if err = r.Patch(ctx, dp, client.RawPatch(types.MergePatchType, patchData)); err != nil {
-				return err
-			}
-		}
-
-		// delete the deviceProfile object on edge platform
-		err := r.edgeClient.Delete(nil, actualName, devcli.DeleteOptions{})
-		if err != nil && !clis.IsNotFoundErr(err) {
-			return err
-		}
-	}
-	return nil
 }
 
 func (r *DeviceProfileReconciler) reconcileCreateDeviceProfile(ctx context.Context, dp *devicev1alpha1.DeviceProfile, actualName string) error {
