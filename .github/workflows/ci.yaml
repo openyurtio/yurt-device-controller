@@ -71,3 +71,11 @@ jobs:
           restore-keys: ${{ runner.os }}-go-
       - name: Build All Binaries
         run: make build
+      - name: Run test
+        run: make test
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: cover.out
+          verbose: true
