@@ -15,4 +15,5 @@ require (
 	k8s.io/klog/v2 v2.9.0
 	sigs.k8s.io/cluster-api v0.4.2
 	sigs.k8s.io/controller-runtime v0.9.6
+	sigs.k8s.io/controller-tools v0.4.1 // indirect
 )

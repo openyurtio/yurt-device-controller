@@ -22,11 +22,11 @@ import (
 	"io/ioutil"
 	"strings"
 
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 )
 
 const (

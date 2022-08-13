@@ -22,6 +22,12 @@ import (
 	"fmt"
 	"time"
 
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
+	"github.com/openyurtio/device-controller/pkg/clients"
+	edgexCli "github.com/openyurtio/device-controller/pkg/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/pkg/controllers/util"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,20 +36,13 @@ import (
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
-	clis "github.com/openyurtio/device-controller/clients"
-	iotcli "github.com/openyurtio/device-controller/clients"
-	edgexCli "github.com/openyurtio/device-controller/clients/edgex-foundry"
-	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
-	"github.com/openyurtio/device-controller/controllers/util"
 )
 
 // DeviceReconciler reconciles a Device object
 type DeviceReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	deviceCli iotcli.DeviceInterface
+	deviceCli clients.DeviceInterface
 	// which nodePool deviceController is deployed in
 	NodePool string
 }
@@ -136,8 +135,8 @@ func (r *DeviceReconciler) reconcileDeleteDevice(ctx context.Context, d *devicev
 		}
 	} else {
 		// delete the device object on the edge platform
-		err := r.deviceCli.Delete(nil, edgeDeviceName, iotcli.DeleteOptions{})
-		if err != nil && !clis.IsNotFoundErr(err) {
+		err := r.deviceCli.Delete(nil, edgeDeviceName, clients.DeleteOptions{})
+		if err != nil && !clients.IsNotFoundErr(err) {
 			return err
 		}
 
@@ -160,16 +159,16 @@ func (r *DeviceReconciler) reconcileCreateDevice(ctx context.Context, d *devicev
 	newDeviceStatus := d.Status.DeepCopy()
 	klog.V(4).Infof("Checking if device already exist on the edge platform: %s", d.GetName())
 	// Checking if device already exist on the edge platform
-	edgeDevice, err := r.deviceCli.Get(nil, edgeDeviceName, iotcli.GetOptions{})
+	edgeDevice, err := r.deviceCli.Get(nil, edgeDeviceName, clients.GetOptions{})
 	if err == nil {
 		// a. If object exists, the status of the device on OpenYurt is updated
 		klog.V(4).Infof("Device already exists on edge platform: %s", d.GetName())
 		newDeviceStatus.EdgeId = edgeDevice.Status.EdgeId
 		newDeviceStatus.Synced = true
-	} else if clis.IsNotFoundErr(err) {
+	} else if clients.IsNotFoundErr(err) {
 		// b. If the object does not exist, a request is sent to the edge platform to create a new device
 		klog.V(4).Infof("Adding device to the edge platform: %s", d.GetName())
-		createdEdgeObj, err := r.deviceCli.Create(nil, d, iotcli.CreateOptions{})
+		createdEdgeObj, err := r.deviceCli.Create(nil, d, clients.CreateOptions{})
 		if err != nil {
 			conditions.MarkFalse(d, devicev1alpha1.DeviceSyncedCondition, "failed to create device on edge platform", clusterv1.ConditionSeverityWarning, err.Error())
 			return fmt.Errorf("fail to add Device to edge platform: %v", err)
@@ -208,7 +207,7 @@ func (r *DeviceReconciler) reconcileUpdateDevice(ctx context.Context, d *devicev
 	} else {
 		updateDevice.Spec.OperatingState = ""
 	}
-	_, err := r.deviceCli.Update(nil, updateDevice, iotcli.UpdateOptions{})
+	_, err := r.deviceCli.Update(nil, updateDevice, clients.UpdateOptions{})
 	if err != nil {
 		conditions.MarkFalse(d, devicev1alpha1.DeviceManagingCondition, "failed to update AdminState or OperatingState of device on edge platform", clusterv1.ConditionSeverityWarning, err.Error())
 		return err
@@ -252,9 +251,9 @@ func (r *DeviceReconciler) reconcileDeviceProperties(d *devicev1alpha1.Device, d
 		propertyName := desiredProperty.Name
 		// 1.1. gets the actual property value of the current device from edge platform
 		klog.V(4).Infof("DeviceName: %s, getting the actual value of property: %s", d.GetName(), propertyName)
-		actualProperty, err := r.deviceCli.GetPropertyState(nil, propertyName, d, iotcli.GetOptions{})
+		actualProperty, err := r.deviceCli.GetPropertyState(nil, propertyName, d, clients.GetOptions{})
 		if err != nil {
-			if !iotcli.IsNotFoundErr(err) {
+			if !clients.IsNotFoundErr(err) {
 				klog.Errorf("DeviceName: %s, failed to get actual property value of %s, err:%v", d.GetName(), propertyName, err)
 				failedPropertyNames = append(failedPropertyNames, propertyName)
 				continue
@@ -273,7 +272,7 @@ func (r *DeviceReconciler) reconcileDeviceProperties(d *devicev1alpha1.Device, d
 		if actualProperty == nil || desiredProperty.DesiredValue != actualProperty.ActualValue {
 			klog.V(4).Infof("DeviceName: %s, the desired value and the actual value are different, desired: %s, actual: %s",
 				d.GetName(), desiredProperty.DesiredValue, actualProperty.ActualValue)
-			if err := r.deviceCli.UpdatePropertyState(nil, propertyName, d, iotcli.UpdateOptions{}); err != nil {
+			if err := r.deviceCli.UpdatePropertyState(nil, propertyName, d, clients.UpdateOptions{}); err != nil {
 				klog.ErrorS(err, "failed to update property", "DeviceName", d.GetName(), "propertyName", propertyName)
 				failedPropertyNames = append(failedPropertyNames, propertyName)
 				continue

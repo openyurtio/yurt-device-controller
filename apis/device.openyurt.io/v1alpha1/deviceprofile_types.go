@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -31,27 +30,7 @@ type DeviceResource struct {
 	Tag         string             `json:"tag,omitempty"`
 	IsHidden    bool               `json:"isHidden"`
 	Properties  ResourceProperties `json:"properties"`
-	Attributes  MapInterfaceValue  `json:"attributes,omitempty"`
-}
-
-// +k8s:deepcopy-gen=false
-type MapInterfaceValue map[string]interface{}
-
-func (in *MapInterfaceValue) DeepCopyInto(out *MapInterfaceValue) {
-	if in == nil {
-		*out = nil
-	} else {
-		*out = runtime.DeepCopyJSON(*in)
-	}
-}
-
-func (in *MapInterfaceValue) DeepCopy() *MapInterfaceValue {
-	if in == nil {
-		return nil
-	}
-	out := new(MapInterfaceValue)
-	in.DeepCopyInto(out)
-	return out
+	Attributes  map[string]string  `json:"attributes,omitempty"`
 }
 
 type ResourceProperties struct {

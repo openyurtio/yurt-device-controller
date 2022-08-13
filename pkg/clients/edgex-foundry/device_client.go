@@ -26,18 +26,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+	"github.com/openyurtio/device-controller/pkg/clients"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos"
-
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
 	edgex_resp "github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
 	"github.com/go-resty/resty/v2"
 	"golang.org/x/net/publicsuffix"
 	"k8s.io/klog/v2"
-
-	"github.com/openyurtio/device-controller/api/v1alpha1"
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
-	edgeCli "github.com/openyurtio/device-controller/clients"
 )
 
 type EdgexDeviceClient struct {
@@ -55,7 +52,7 @@ func NewEdgexDeviceClient(coreMetaAddr, coreCommandAddr string) *EdgexDeviceClie
 }
 
 // Create function sends a POST request to EdgeX to add a new device
-func (efc *EdgexDeviceClient) Create(ctx context.Context, device *devicev1alpha1.Device, options edgeCli.CreateOptions) (*devicev1alpha1.Device, error) {
+func (efc *EdgexDeviceClient) Create(ctx context.Context, device *devicev1alpha1.Device, options clients.CreateOptions) (*devicev1alpha1.Device, error) {
 	devs := []*devicev1alpha1.Device{device}
 	req := makeEdgeXDeviceRequest(devs)
 	klog.V(5).Infof("will add the Device: %s", device.Name)
@@ -91,7 +88,7 @@ func (efc *EdgexDeviceClient) Create(ctx context.Context, device *devicev1alpha1
 }
 
 // Delete function sends a request to EdgeX to delete a device
-func (efc *EdgexDeviceClient) Delete(ctx context.Context, name string, options edgeCli.DeleteOptions) error {
+func (efc *EdgexDeviceClient) Delete(ctx context.Context, name string, options clients.DeleteOptions) error {
 	klog.V(5).Infof("will delete the Device: %s", name)
 	delURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, name)
 	resp, err := efc.R().Delete(delURL)
@@ -106,7 +103,7 @@ func (efc *EdgexDeviceClient) Delete(ctx context.Context, name string, options e
 
 // Update is used to set the admin or operating state of the device by unique name of the device.
 // TODO support to update other fields
-func (efc *EdgexDeviceClient) Update(ctx context.Context, device *devicev1alpha1.Device, options edgeCli.UpdateOptions) (*devicev1alpha1.Device, error) {
+func (efc *EdgexDeviceClient) Update(ctx context.Context, device *devicev1alpha1.Device, options clients.UpdateOptions) (*devicev1alpha1.Device, error) {
 	actualDeviceName := getEdgeDeviceName(device)
 	putURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, actualDeviceName)
 	if device == nil {
@@ -137,7 +134,7 @@ func (efc *EdgexDeviceClient) Update(ctx context.Context, device *devicev1alpha1
 }
 
 // Get is used to query the device information corresponding to the device name
-func (efc *EdgexDeviceClient) Get(ctx context.Context, deviceName string, options edgeCli.GetOptions) (*devicev1alpha1.Device, error) {
+func (efc *EdgexDeviceClient) Get(ctx context.Context, deviceName string, options clients.GetOptions) (*devicev1alpha1.Device, error) {
 	klog.V(5).Infof("will get Devices: %s", deviceName)
 	var dResp edgex_resp.DeviceResponse
 	getURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, deviceName)
@@ -158,7 +155,7 @@ func (efc *EdgexDeviceClient) Get(ctx context.Context, deviceName string, option
 
 // List is used to get all device objects on edge platform
 // TODO:support label filtering according to options
-func (efc *EdgexDeviceClient) List(ctx context.Context, options edgeCli.ListOptions) ([]devicev1alpha1.Device, error) {
+func (efc *EdgexDeviceClient) List(ctx context.Context, options clients.ListOptions) ([]devicev1alpha1.Device, error) {
 	lp := fmt.Sprintf("http://%s%s/all?limit=-1", efc.CoreMetaAddr, DevicePath)
 	resp, err := efc.R().EnableTrace().Get(lp)
 	if err != nil {
@@ -175,7 +172,7 @@ func (efc *EdgexDeviceClient) List(ctx context.Context, options edgeCli.ListOpti
 	return res, nil
 }
 
-func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName string, d *devicev1alpha1.Device, options edgeCli.GetOptions) (*devicev1alpha1.ActualPropertyState, error) {
+func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName string, d *devicev1alpha1.Device, options clients.GetOptions) (*devicev1alpha1.ActualPropertyState, error) {
 	actualDeviceName := getEdgeDeviceName(d)
 	// get the old property from status
 	oldAps, exist := d.Status.DeviceProperties[propertyName]
@@ -193,7 +190,7 @@ func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName
 			}
 		}
 		if propertyGetURL == "" {
-			return nil, &edgeCli.NotFoundError{}
+			return nil, &clients.NotFoundError{}
 		}
 	} else {
 		propertyGetURL = oldAps.GetURL
@@ -238,7 +235,7 @@ func getPropertyState(getURL string) (*resty.Response, error) {
 	return resp, err
 }
 
-func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyName string, d *devicev1alpha1.Device, options edgeCli.UpdateOptions) error {
+func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyName string, d *devicev1alpha1.Device, options clients.UpdateOptions) error {
 	// Get the actual device name
 	acturalDeviceName := getEdgeDeviceName(d)
 
@@ -292,7 +289,7 @@ func (efc *EdgexDeviceClient) getPropertyPut(deviceName, cmdName string) (dtos.C
 }
 
 // ListPropertiesState gets all the actual property information about a device
-func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *devicev1alpha1.Device, options edgeCli.ListOptions) (map[string]v1alpha1.DesiredPropertyState, map[string]devicev1alpha1.ActualPropertyState, error) {
+func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *devicev1alpha1.Device, options clients.ListOptions) (map[string]devicev1alpha1.DesiredPropertyState, map[string]devicev1alpha1.ActualPropertyState, error) {
 	actualDeviceName := getEdgeDeviceName(device)
 
 	dpsm := map[string]devicev1alpha1.DesiredPropertyState{}

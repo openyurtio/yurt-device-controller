@@ -19,7 +19,7 @@ package clients
 import (
 	"context"
 
-	"github.com/openyurtio/device-controller/api/v1alpha1"
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
 )
 
 // CreateOptions defines additional options when creating an object
@@ -53,34 +53,34 @@ type ListOptions struct {
 // DeviceInterface defines the interfaces which used to create, delete, update, get and list Device objects on edge-side platform
 type DeviceInterface interface {
 	DevicePropertyInterface
-	Create(ctx context.Context, device *v1alpha1.Device, options CreateOptions) (*v1alpha1.Device, error)
+	Create(ctx context.Context, device *devicev1alpha1.Device, options CreateOptions) (*devicev1alpha1.Device, error)
 	Delete(ctx context.Context, name string, options DeleteOptions) error
-	Update(ctx context.Context, device *v1alpha1.Device, options UpdateOptions) (*v1alpha1.Device, error)
-	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.Device, error)
-	List(ctx context.Context, options ListOptions) ([]v1alpha1.Device, error)
+	Update(ctx context.Context, device *devicev1alpha1.Device, options UpdateOptions) (*devicev1alpha1.Device, error)
+	Get(ctx context.Context, name string, options GetOptions) (*devicev1alpha1.Device, error)
+	List(ctx context.Context, options ListOptions) ([]devicev1alpha1.Device, error)
 }
 
 // DevicePropertyInterface defines the interfaces which used to get, list and set the actual status value of the device properties
 type DevicePropertyInterface interface {
-	GetPropertyState(ctx context.Context, propertyName string, device *v1alpha1.Device, options GetOptions) (*v1alpha1.ActualPropertyState, error)
-	UpdatePropertyState(ctx context.Context, propertyName string, device *v1alpha1.Device, options UpdateOptions) error
-	ListPropertiesState(ctx context.Context, device *v1alpha1.Device, options ListOptions) (map[string]v1alpha1.DesiredPropertyState, map[string]v1alpha1.ActualPropertyState, error)
+	GetPropertyState(ctx context.Context, propertyName string, device *devicev1alpha1.Device, options GetOptions) (*devicev1alpha1.ActualPropertyState, error)
+	UpdatePropertyState(ctx context.Context, propertyName string, device *devicev1alpha1.Device, options UpdateOptions) error
+	ListPropertiesState(ctx context.Context, device *devicev1alpha1.Device, options ListOptions) (map[string]devicev1alpha1.DesiredPropertyState, map[string]devicev1alpha1.ActualPropertyState, error)
 }
 
 // DeviceServiceInterface defines the interfaces which used to create, delete, update, get and list DeviceService objects on edge-side platform
 type DeviceServiceInterface interface {
-	Create(ctx context.Context, deviceService *v1alpha1.DeviceService, options CreateOptions) (*v1alpha1.DeviceService, error)
+	Create(ctx context.Context, deviceService *devicev1alpha1.DeviceService, options CreateOptions) (*devicev1alpha1.DeviceService, error)
 	Delete(ctx context.Context, name string, options DeleteOptions) error
-	Update(ctx context.Context, deviceService *v1alpha1.DeviceService, options UpdateOptions) (*v1alpha1.DeviceService, error)
-	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.DeviceService, error)
-	List(ctx context.Context, options ListOptions) ([]v1alpha1.DeviceService, error)
+	Update(ctx context.Context, deviceService *devicev1alpha1.DeviceService, options UpdateOptions) (*devicev1alpha1.DeviceService, error)
+	Get(ctx context.Context, name string, options GetOptions) (*devicev1alpha1.DeviceService, error)
+	List(ctx context.Context, options ListOptions) ([]devicev1alpha1.DeviceService, error)
 }
 
 // DeviceProfileInterface defines the interfaces which used to create, delete, update, get and list DeviceProfile objects on edge-side platform
 type DeviceProfileInterface interface {
-	Create(ctx context.Context, deviceProfile *v1alpha1.DeviceProfile, options CreateOptions) (*v1alpha1.DeviceProfile, error)
+	Create(ctx context.Context, deviceProfile *devicev1alpha1.DeviceProfile, options CreateOptions) (*devicev1alpha1.DeviceProfile, error)
 	Delete(ctx context.Context, name string, options DeleteOptions) error
-	Update(ctx context.Context, deviceProfile *v1alpha1.DeviceProfile, options UpdateOptions) (*v1alpha1.DeviceProfile, error)
-	Get(ctx context.Context, name string, options GetOptions) (*v1alpha1.DeviceProfile, error)
-	List(ctx context.Context, options ListOptions) ([]v1alpha1.DeviceProfile, error)
+	Update(ctx context.Context, deviceProfile *devicev1alpha1.DeviceProfile, options UpdateOptions) (*devicev1alpha1.DeviceProfile, error)
+	Get(ctx context.Context, name string, options GetOptions) (*devicev1alpha1.DeviceProfile, error)
+	List(ctx context.Context, options ListOptions) ([]devicev1alpha1.DeviceProfile, error)
 }

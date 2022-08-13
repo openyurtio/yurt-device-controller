@@ -21,11 +21,11 @@ import (
 	"strings"
 	"time"
 
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
-	edgeCli "github.com/openyurtio/device-controller/clients"
-	efCli "github.com/openyurtio/device-controller/clients/edgex-foundry"
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
 	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
-	"github.com/openyurtio/device-controller/controllers/util"
+	edgeCli "github.com/openyurtio/device-controller/pkg/clients"
+	efCli "github.com/openyurtio/device-controller/pkg/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/pkg/controllers/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"

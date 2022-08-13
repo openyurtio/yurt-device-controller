@@ -17,16 +17,16 @@ limitations under the License.
 package edgex_foundry
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos"
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/requests"
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/models"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 )
 
 const (
@@ -75,12 +75,17 @@ func toEdgeXDeviceResourceSlice(drs []devicev1alpha1.DeviceResource) []dtos.Devi
 }
 
 func toEdgeXDeviceResource(dr devicev1alpha1.DeviceResource) dtos.DeviceResource {
+	genericAttrs := make(map[string]interface{})
+	for k, v := range dr.Attributes {
+		genericAttrs[k] = v
+	}
+
 	return dtos.DeviceResource{
 		Description: dr.Description,
 		Name:        dr.Name,
 		Tag:         dr.Tag,
 		Properties:  toEdgeXProfileProperty(dr.Properties),
-		Attributes:  dr.Attributes,
+		Attributes:  genericAttrs,
 	}
 }
 
@@ -302,13 +307,31 @@ func toKubeDeviceResources(drs []dtos.DeviceResource) []devicev1alpha1.DeviceRes
 }
 
 func toKubeDeviceResource(dr dtos.DeviceResource) devicev1alpha1.DeviceResource {
+	concreteAttrs := make(map[string]string)
+	for k, v := range dr.Attributes {
+		switch v.(type) {
+		case string:
+			concreteAttrs[k] = v.(string)
+			continue
+		case int:
+			concreteAttrs[k] = fmt.Sprintf("%d", v.(int))
+			continue
+		case float64:
+			concreteAttrs[k] = fmt.Sprintf("%f", v.(float64))
+			continue
+		case fmt.Stringer:
+			concreteAttrs[k] = v.(fmt.Stringer).String()
+			continue
+		}
+	}
+
 	return devicev1alpha1.DeviceResource{
 		Description: dr.Description,
 		Name:        dr.Name,
 		Tag:         dr.Tag,
 		IsHidden:    dr.IsHidden,
 		Properties:  toKubeProfileProperty(dr.Properties),
-		Attributes:  dr.Attributes,
+		Attributes:  concreteAttrs,
 	}
 }
 

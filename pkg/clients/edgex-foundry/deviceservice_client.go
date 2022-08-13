@@ -23,15 +23,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
+	"github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+	edgeCli "github.com/openyurtio/device-controller/pkg/clients"
 
+	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/common"
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/dtos/responses"
 
 	"github.com/go-resty/resty/v2"
 	"k8s.io/klog/v2"
-
-	"github.com/openyurtio/device-controller/api/v1alpha1"
-	edgeCli "github.com/openyurtio/device-controller/clients"
 )
 
 type EdgexDeviceServiceClient struct {

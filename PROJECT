@@ -1,5 +1,7 @@
 domain: openyurt.io
-layout: go.kubebuilder.io/v3
+layout:
+- go.kubebuilder.io/v3
+multigroup: true
 projectName: device-controller
 repo: github.com/openyurtio/device-controller
 resources:
@@ -18,4 +20,4 @@ resources:
   group: device
   kind: Device
   version: v1alpha1
-version: 3-alpha
+version: "3"

@@ -21,16 +21,16 @@ import (
 	"strings"
 	"time"
 
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
+	devcli "github.com/openyurtio/device-controller/pkg/clients"
+	edgexclis "github.com/openyurtio/device-controller/pkg/clients/edgex-foundry"
+	"github.com/openyurtio/device-controller/pkg/controllers/util"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlmgr "sigs.k8s.io/controller-runtime/pkg/manager"
-
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
-	devcli "github.com/openyurtio/device-controller/clients"
-	edgexclis "github.com/openyurtio/device-controller/clients/edgex-foundry"
-	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
-	"github.com/openyurtio/device-controller/controllers/util"
 )
 
 type DeviceProfileSyncer struct {

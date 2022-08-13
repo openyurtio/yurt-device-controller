@@ -21,6 +21,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/openyurtio/device-controller/pkg/controllers"
+	"github.com/openyurtio/device-controller/pkg/controllers/util"
+
+	devicev1alpha1 "github.com/openyurtio/device-controller/apis/device.openyurt.io/v1alpha1"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,10 +38,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	devicev1alpha1 "github.com/openyurtio/device-controller/api/v1alpha1"
 	"github.com/openyurtio/device-controller/cmd/yurt-device-controller/options"
-	"github.com/openyurtio/device-controller/controllers"
-	controllerutil "github.com/openyurtio/device-controller/controllers/util"
 )
 
 var (
@@ -97,14 +99,14 @@ func Run(opts *options.YurtDeviceControllerOptions, stopCh <-chan struct{}) {
 
 	// register the field indexers
 	setupLog.Info("[preflight] Registering the field indexers")
-	if err := controllerutil.RegisterFieldIndexers(mgr.GetFieldIndexer()); err != nil {
+	if err := util.RegisterFieldIndexers(mgr.GetFieldIndexer()); err != nil {
 		setupLog.Error(err, "failed to register field indexers")
 		os.Exit(1)
 	}
 
 	// get nodepool where device-controller run
 	if opts.Nodepool == "" {
-		opts.Nodepool, err = controllerutil.GetNodePool(mgr.GetConfig())
+		opts.Nodepool, err = util.GetNodePool(mgr.GetConfig())
 		if err != nil {
 			setupLog.Error(err, "failed to get the nodepool where device-controller run")
 			os.Exit(1)

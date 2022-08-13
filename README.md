@@ -10,7 +10,6 @@
 [![codecov](https://codecov.io/gh/openyurtio/yurt-device-controller/branch/main/graph/badge.svg)](https://codecov.io/gh/openyurtio/yurt-device-controller)
 </div>
 
-
 This repository contains three CRD/controllers, Device, DeviceService and DeviceProfile:
 
 - The `DeviceProfile` defines a type of devices using same kind of protocol, which includes some generic information like the manufacturer's name, the device description, and the device model. DeviceProfile also defines what kind of resources (e.g., temperature, humidity) this type of device provided and how to read/write these resources.
