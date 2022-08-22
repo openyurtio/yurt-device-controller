@@ -62,7 +62,7 @@ func (r *DeviceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	klog.V(3).Infof("Reconciling the DeviceService: %s", ds.GetName())
 	// Update deviceService conditions
 	defer func() {
-		if ds.Spec.Managed != true {
+		if !ds.Spec.Managed {
 			conditions.MarkFalse(&ds, devicev1alpha1.DeviceServiceManagingCondition, "this deviceService is not managed by openyurt", clusterv1.ConditionSeverityInfo, "")
 		}
 		conditions.SetSummary(&ds,
@@ -84,7 +84,7 @@ func (r *DeviceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	if ds.Status.Synced == false {
+	if !ds.Status.Synced {
 		// 2. Synchronize OpenYurt deviceService to edge platform
 		if err := r.reconcileCreateDeviceService(ctx, &ds); err != nil {
 			if apierrors.IsConflict(err) {
@@ -93,7 +93,7 @@ func (r *DeviceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				return ctrl.Result{}, err
 			}
 		}
-	} else if ds.Spec.Managed == true {
+	} else if ds.Spec.Managed {
 		// 3. If the deviceService has been synchronized and is managed by the cloud, reconcile the deviceService fields
 		if err := r.reconcileUpdateDeviceService(ctx, &ds); err != nil {
 			if apierrors.IsConflict(err) {
@@ -150,7 +150,7 @@ func (r *DeviceServiceReconciler) reconcileDeleteDeviceService(ctx context.Conte
 		}
 
 		// delete the deviceService object on edge platform
-		err := r.deviceServiceCli.Delete(nil, edgeDeviceServiceName, clients.DeleteOptions{})
+		err := r.deviceServiceCli.Delete(context.TODO(), edgeDeviceServiceName, clients.DeleteOptions{})
 		if err != nil && !clients.IsNotFoundErr(err) {
 			return err
 		}
@@ -163,12 +163,12 @@ func (r *DeviceServiceReconciler) reconcileCreateDeviceService(ctx context.Conte
 	edgeDeviceServiceName := util.GetEdgeDeviceServiceName(ds, EdgeXObjectName)
 	klog.V(4).Infof("Checking if deviceService already exist on the edge platform: %s", ds.GetName())
 	// Checking if deviceService already exist on the edge platform
-	if edgeDs, err := r.deviceServiceCli.Get(nil, edgeDeviceServiceName, clients.GetOptions{}); err != nil {
+	if edgeDs, err := r.deviceServiceCli.Get(context.TODO(), edgeDeviceServiceName, clients.GetOptions{}); err != nil {
 		if !clients.IsNotFoundErr(err) {
 			klog.V(4).ErrorS(err, "fail to visit the edge platform")
 			return nil
 		} else {
-			createdDs, err := r.deviceServiceCli.Create(nil, ds, clients.CreateOptions{})
+			createdDs, err := r.deviceServiceCli.Create(context.TODO(), ds, clients.CreateOptions{})
 			if err != nil {
 				klog.V(4).ErrorS(err, "failed to create deviceService on edge platform")
 				conditions.MarkFalse(ds, devicev1alpha1.DeviceServiceSyncedCondition, "failed to add DeviceService to EdgeX", clusterv1.ConditionSeverityWarning, err.Error())
@@ -201,7 +201,7 @@ func (r *DeviceServiceReconciler) reconcileUpdateDeviceService(ctx context.Conte
 		updateDeviceService.Spec.AdminState = ""
 	}
 
-	_, err := r.deviceServiceCli.Update(nil, updateDeviceService, clients.UpdateOptions{})
+	_, err := r.deviceServiceCli.Update(context.TODO(), updateDeviceService, clients.UpdateOptions{})
 	if err != nil {
 		conditions.MarkFalse(ds, devicev1alpha1.DeviceServiceManagingCondition, "failed to update AdminState of deviceService on edge platform", clusterv1.ConditionSeverityWarning, err.Error())
 		return err

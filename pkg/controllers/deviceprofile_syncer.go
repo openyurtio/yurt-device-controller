@@ -114,7 +114,7 @@ func (dps *DeviceProfileSyncer) getAllDeviceProfiles() (
 	kubeDeviceProfiles := map[string]devicev1alpha1.DeviceProfile{}
 
 	// 1. list deviceProfiles on edge platform
-	eDps, err := dps.edgeClient.List(nil, devcli.ListOptions{})
+	eDps, err := dps.edgeClient.List(context.TODO(), devcli.ListOptions{})
 	if err != nil {
 		klog.V(4).ErrorS(err, "fail to list the deviceProfiles on the edge platform")
 		return edgeDeviceProfiles, kubeDeviceProfiles, err
