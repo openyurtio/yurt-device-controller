@@ -39,8 +39,7 @@ func genFirstUpdateFilter(objKind string) predicate.Predicate {
 				klog.Infof("fail to assert object to deviceprofile, object kind is %s", objKind)
 				return false
 			}
-			if oldDp.IsAddedToEdgeX() == false &&
-				newDp.IsAddedToEdgeX() == true {
+			if !oldDp.IsAddedToEdgeX() && newDp.IsAddedToEdgeX() {
 				return false
 			}
 			return true

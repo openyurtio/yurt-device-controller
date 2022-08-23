@@ -126,7 +126,11 @@ func Run(opts *options.YurtDeviceControllerOptions, stopCh <-chan struct{}) {
 		setupLog.Error(err, "unable to create syncer", "syncer", "DeviceProfile")
 		os.Exit(1)
 	}
-	mgr.Add(dfs.NewDeviceProfileSyncerRunnable())
+	err = mgr.Add(dfs.NewDeviceProfileSyncerRunnable())
+	if err != nil {
+		setupLog.Error(err, "unable to create syncer runnable", "syncer", "DeviceProfile")
+		os.Exit(1)
+	}
 
 	// setup the Device Reconciler and Syncer
 	if err = (&controllers.DeviceReconciler{
@@ -141,7 +145,11 @@ func Run(opts *options.YurtDeviceControllerOptions, stopCh <-chan struct{}) {
 		setupLog.Error(err, "unable to create syncer", "controller", "Device")
 		os.Exit(1)
 	}
-	mgr.Add(ds.NewDeviceSyncerRunnable())
+	err = mgr.Add(ds.NewDeviceSyncerRunnable())
+	if err != nil {
+		setupLog.Error(err, "unable to create syncer runnable", "syncer", "Device")
+		os.Exit(1)
+	}
 
 	// setup the DeviceService Reconciler and Syncer
 	if err = (&controllers.DeviceServiceReconciler{
@@ -156,7 +164,11 @@ func Run(opts *options.YurtDeviceControllerOptions, stopCh <-chan struct{}) {
 		setupLog.Error(err, "unable to create syncer", "syncer", "DeviceService")
 		os.Exit(1)
 	}
-	mgr.Add(dss.NewDeviceServiceSyncerRunnable())
+	err = mgr.Add(dss.NewDeviceServiceSyncerRunnable())
+	if err != nil {
+		setupLog.Error(err, "unable to create syncer runnable", "syncer", "DeviceService")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {

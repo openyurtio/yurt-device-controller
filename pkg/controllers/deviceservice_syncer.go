@@ -113,7 +113,7 @@ func (ds *DeviceServiceSyncer) getAllDeviceServices() (
 	kubeDeviceServices := map[string]devicev1alpha1.DeviceService{}
 
 	// 1. list deviceServices on edge platform
-	eDevSs, err := ds.deviceServiceCli.List(nil, iotcli.ListOptions{})
+	eDevSs, err := ds.deviceServiceCli.List(context.TODO(), iotcli.ListOptions{})
 	if err != nil {
 		klog.V(4).ErrorS(err, "fail to list the deviceServices object on the edge platform")
 		return edgeDeviceServices, kubeDeviceServices, err

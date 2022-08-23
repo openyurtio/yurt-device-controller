@@ -63,10 +63,7 @@ var _ = Describe("Device controller", func() {
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, lookupKey, created)
-				if err != nil {
-					return false
-				}
-				return true
+				return err == nil
 			}, timeout, interval).Should(BeTrue())
 			time.Sleep(5 * time.Second)
 			Expect(created.Spec.NodePool).Should(Equal(PoolName))
