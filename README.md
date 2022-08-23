@@ -4,9 +4,9 @@
 
 <img src="https://github.com/openyurtio/openyurt/blob/master/docs/img/OpenYurt.png" width="400" height="94"><br/>
 
-[![Version](https://img.shields.io/badge/YurtDeviceController-v0.2.0-orange)]
+[![Version](https://img.shields.io/badge/YurtDeviceController-v0.2.0-orange)]()
 [![License](https://img.shields.io/badge/license-Apache%202-4EB1BA.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
-[![Go Report Card](https://goreportcard.com/badge/github.com/openyurtio/yurt-device-controller)](https://goreportcard.com/report/github.com/openyurtio/yurt-device-controller)
+[![Go Report Card](https://goreportcard.com/badge/github.com/openyurtio/device-controller)](https://goreportcard.com/report/github.com/openyurtio/device-controller)
 [![codecov](https://codecov.io/gh/openyurtio/yurt-device-controller/branch/main/graph/badge.svg)](https://codecov.io/gh/openyurtio/yurt-device-controller)
 </div>
 
