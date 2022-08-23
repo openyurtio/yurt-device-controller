@@ -314,18 +314,18 @@ func toKubeDeviceResources(drs []dtos.DeviceResource) []devicev1alpha1.DeviceRes
 func toKubeDeviceResource(dr dtos.DeviceResource) devicev1alpha1.DeviceResource {
 	concreteAttrs := make(map[string]string)
 	for k, v := range dr.Attributes {
-		switch v.(type) {
+		switch asserted := v.(type) {
 		case string:
-			concreteAttrs[k] = v.(string)
+			concreteAttrs[k] = asserted
 			continue
 		case int:
-			concreteAttrs[k] = fmt.Sprintf("%d", v.(int))
+			concreteAttrs[k] = fmt.Sprintf("%d", asserted)
 			continue
 		case float64:
-			concreteAttrs[k] = fmt.Sprintf("%f", v.(float64))
+			concreteAttrs[k] = fmt.Sprintf("%f", asserted)
 			continue
 		case fmt.Stringer:
-			concreteAttrs[k] = v.(fmt.Stringer).String()
+			concreteAttrs[k] = asserted.String()
 			continue
 		}
 	}

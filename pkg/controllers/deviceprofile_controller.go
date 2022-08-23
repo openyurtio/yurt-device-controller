@@ -68,7 +68,7 @@ func (r *DeviceProfileReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	if dp.Status.Synced == false {
+	if !dp.Status.Synced {
 		// 2. Synchronize OpenYurt deviceProfile to edge platform
 		if err := r.reconcileCreateDeviceProfile(ctx, &dp, dpActualName); err != nil {
 			if apierrors.IsConflict(err) {
@@ -127,7 +127,7 @@ func (r *DeviceProfileReconciler) reconcileDeleteDeviceProfile(ctx context.Conte
 		}
 
 		// delete the deviceProfile object on edge platform
-		err := r.edgeClient.Delete(nil, actualName, clients.DeleteOptions{})
+		err := r.edgeClient.Delete(context.TODO(), actualName, clients.DeleteOptions{})
 		if err != nil && !clients.IsNotFoundErr(err) {
 			return err
 		}
@@ -137,7 +137,7 @@ func (r *DeviceProfileReconciler) reconcileDeleteDeviceProfile(ctx context.Conte
 
 func (r *DeviceProfileReconciler) reconcileCreateDeviceProfile(ctx context.Context, dp *devicev1alpha1.DeviceProfile, actualName string) error {
 	klog.V(4).Infof("Checking if deviceProfile already exist on the edge platform: %s", dp.GetName())
-	if edgeDp, err := r.edgeClient.Get(nil, actualName, clients.GetOptions{}); err != nil {
+	if edgeDp, err := r.edgeClient.Get(context.TODO(), actualName, clients.GetOptions{}); err != nil {
 		if !clients.IsNotFoundErr(err) {
 			klog.V(4).ErrorS(err, "fail to visit the edge platform")
 			return nil
