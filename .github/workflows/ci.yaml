@@ -10,12 +10,12 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.16'
-  GOLANGCI_VERSION: 'v1.45'
+  GO_VERSION: '1.17'
+  GOLANGCI_VERSION: 'v1.48.0'
 
 jobs:
   check-license:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -23,24 +23,24 @@ jobs:
         run: hack/make-rules/check_license.sh
 
   golangci-lint:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/setup-go@v3
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/checkout@v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Lint golang code
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
         with:
           version: ${{ env.GOLANGCI_VERSION }}
-          args: --disable-all  -E deadcode -E gofmt -E goimports -E ineffassign -E misspell -E vet --timeout=15m
+          args: --timeout=15m
 
   markdownlint-misspell-shellcheck:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     # this image is build from Dockerfile
     # https://github.com/pouchcontainer/pouchlinter/blob/master/Dockerfile
     container: pouchcontainer/pouchlinter:v0.1.2
@@ -52,7 +52,7 @@ jobs:
       - name: Lint markdown files
         run: find  ./ -name  "*.md" | grep -v enhancements |  grep -v .github |  xargs mdl -r ~MD010,~MD013,~MD014,~MD022,~MD024,~MD029,~MD031,~MD032,~MD033,~MD034,~MD036
   build-binaries:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
         with:

@@ -113,7 +113,7 @@ func (ds *DeviceSyncer) getAllDevices() (map[string]devicev1alpha1.Device, map[s
 	edgeDevice := map[string]devicev1alpha1.Device{}
 	kubeDevice := map[string]devicev1alpha1.Device{}
 	// 1. list devices on edge platform
-	eDevs, err := ds.deviceCli.List(nil, edgeCli.ListOptions{})
+	eDevs, err := ds.deviceCli.List(context.TODO(), edgeCli.ListOptions{})
 	if err != nil {
 		klog.V(4).ErrorS(err, "fail to list the devices object on the Edge Platform")
 		return edgeDevice, kubeDevice, err
@@ -226,7 +226,7 @@ func (ds *DeviceSyncer) completeCreateContent(edgeDevice *devicev1alpha1.Device)
 // completeUpdateContent completes the content of the device which will be updated on OpenYurt
 func (ds *DeviceSyncer) completeUpdateContent(kubeDevice *devicev1alpha1.Device, edgeDevice *devicev1alpha1.Device) *devicev1alpha1.Device {
 	updatedDevice := kubeDevice.DeepCopy()
-	_, aps, _ := ds.deviceCli.ListPropertiesState(nil, updatedDevice, edgeCli.ListOptions{})
+	_, aps, _ := ds.deviceCli.ListPropertiesState(context.TODO(), updatedDevice, edgeCli.ListOptions{})
 	// update device status
 	updatedDevice.Status.LastConnected = edgeDevice.Status.LastConnected
 	updatedDevice.Status.LastReported = edgeDevice.Status.LastReported
