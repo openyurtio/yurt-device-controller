@@ -104,7 +104,7 @@ func (efc *EdgexDeviceClient) Delete(ctx context.Context, name string, options c
 // Update is used to set the admin or operating state of the device by unique name of the device.
 // TODO support to update other fields
 func (efc *EdgexDeviceClient) Update(ctx context.Context, device *devicev1alpha1.Device, options clients.UpdateOptions) (*devicev1alpha1.Device, error) {
-	actualDeviceName := getEdgeDeviceName(device)
+	actualDeviceName := getEdgeXName(device)
 	putURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, actualDeviceName)
 	if device == nil {
 		return nil, nil
@@ -173,7 +173,7 @@ func (efc *EdgexDeviceClient) List(ctx context.Context, options clients.ListOpti
 }
 
 func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName string, d *devicev1alpha1.Device, options clients.GetOptions) (*devicev1alpha1.ActualPropertyState, error) {
-	actualDeviceName := getEdgeDeviceName(d)
+	actualDeviceName := getEdgeXName(d)
 	// get the old property from status
 	oldAps, exist := d.Status.DeviceProperties[propertyName]
 	propertyGetURL := ""
@@ -237,7 +237,7 @@ func getPropertyState(getURL string) (*resty.Response, error) {
 
 func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyName string, d *devicev1alpha1.Device, options clients.UpdateOptions) error {
 	// Get the actual device name
-	acturalDeviceName := getEdgeDeviceName(d)
+	acturalDeviceName := getEdgeXName(d)
 
 	dps := d.Spec.DeviceProperties[propertyName]
 	parameterName := dps.Name
@@ -290,7 +290,7 @@ func (efc *EdgexDeviceClient) getPropertyPut(deviceName, cmdName string) (dtos.C
 
 // ListPropertiesState gets all the actual property information about a device
 func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *devicev1alpha1.Device, options clients.ListOptions) (map[string]devicev1alpha1.DesiredPropertyState, map[string]devicev1alpha1.ActualPropertyState, error) {
-	actualDeviceName := getEdgeDeviceName(device)
+	actualDeviceName := getEdgeXName(device)
 
 	dpsm := map[string]devicev1alpha1.DesiredPropertyState{}
 	apsm := map[string]devicev1alpha1.ActualPropertyState{}

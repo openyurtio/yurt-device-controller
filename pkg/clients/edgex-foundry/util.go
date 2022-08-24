@@ -44,12 +44,12 @@ type ClientURL struct {
 	Port int
 }
 
-func getEdgeDeviceName(d *devicev1alpha1.Device) string {
+func getEdgeXName(provider metav1.Object) string {
 	var actualDeviceName string
-	if _, ok := d.ObjectMeta.Labels[EdgeXObjectName]; ok {
-		actualDeviceName = d.ObjectMeta.Labels[EdgeXObjectName]
+	if _, ok := provider.GetLabels()[EdgeXObjectName]; ok {
+		actualDeviceName = provider.GetLabels()[EdgeXObjectName]
 	} else {
-		actualDeviceName = d.GetName()
+		actualDeviceName = provider.GetName()
 	}
 	return actualDeviceName
 }
@@ -57,7 +57,7 @@ func getEdgeDeviceName(d *devicev1alpha1.Device) string {
 func toEdgexDeviceService(ds *devicev1alpha1.DeviceService) dtos.DeviceService {
 	return dtos.DeviceService{
 		Description:   ds.Spec.Description,
-		Name:          ds.GetName(),
+		Name:          getEdgeXName(ds),
 		LastConnected: ds.Status.LastConnected,
 		LastReported:  ds.Status.LastReported,
 		Labels:        ds.Spec.Labels,
@@ -134,7 +134,7 @@ func toKubeDeviceService(ds dtos.DeviceService) devicev1alpha1.DeviceService {
 func toEdgeXDevice(d *devicev1alpha1.Device) dtos.Device {
 	md := dtos.Device{
 		Description:    d.Spec.Description,
-		Name:           d.GetName(),
+		Name:           getEdgeXName(d),
 		AdminState:     string(toEdgeXAdminState(d.Spec.AdminState)),
 		OperatingState: string(toEdgeXOperatingState(d.Spec.OperatingState)),
 		Protocols:      toEdgeXProtocols(d.Spec.Protocols),
@@ -357,7 +357,7 @@ func toKubeProfileProperty(rp dtos.ResourceProperties) devicev1alpha1.ResourcePr
 func toEdgeXDeviceProfile(dp *devicev1alpha1.DeviceProfile) dtos.DeviceProfile {
 	return dtos.DeviceProfile{
 		Description:     dp.Spec.Description,
-		Name:            dp.GetName(),
+		Name:            getEdgeXName(dp),
 		Manufacturer:    dp.Spec.Manufacturer,
 		Model:           dp.Spec.Model,
 		Labels:          dp.Spec.Labels,
