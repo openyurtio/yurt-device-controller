@@ -44,8 +44,13 @@ type EdgexDeviceClient struct {
 }
 
 func NewEdgexDeviceClient(coreMetaAddr, coreCommandAddr string) *EdgexDeviceClient {
+	cookieJar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	instance := resty.NewWithClient(&http.Client{
+		Jar:     cookieJar,
+		Timeout: 10 * time.Second,
+	})
 	return &EdgexDeviceClient{
-		Client:          resty.New(),
+		Client:          instance,
 		CoreMetaAddr:    coreMetaAddr,
 		CoreCommandAddr: coreCommandAddr,
 	}
@@ -105,29 +110,23 @@ func (efc *EdgexDeviceClient) Delete(ctx context.Context, name string, options c
 // TODO support to update other fields
 func (efc *EdgexDeviceClient) Update(ctx context.Context, device *devicev1alpha1.Device, options clients.UpdateOptions) (*devicev1alpha1.Device, error) {
 	actualDeviceName := getEdgeDeviceName(device)
-	putURL := fmt.Sprintf("http://%s%s/name/%s", efc.CoreMetaAddr, DevicePath, actualDeviceName)
+	patchURL := fmt.Sprintf("http://%s%s", efc.CoreMetaAddr, DevicePath)
 	if device == nil {
 		return nil, nil
 	}
-	updateData := map[string]string{}
-	if device.Spec.AdminState != "" {
-		updateData["adminState"] = string(device.Spec.AdminState)
-	}
-	if device.Spec.OperatingState != "" {
-		updateData["operatingState"] = string(device.Spec.OperatingState)
-	}
-	if len(updateData) == 0 {
-		return nil, nil
-	}
-
-	data, _ := json.Marshal(updateData)
-	rep, err := resty.New().R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(data).
-		Put(putURL)
+	devs := []*devicev1alpha1.Device{device}
+	req := makeEdgeXDeviceUpdateRequest(devs)
+	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
-	} else if rep.StatusCode() != http.StatusOK {
+	}
+	rep, err := efc.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(reqBody).
+		Patch(patchURL)
+	if err != nil {
+		return nil, err
+	} else if rep.StatusCode() != http.StatusMultiStatus {
 		return nil, fmt.Errorf("failed to update device: %s, get response: %s", actualDeviceName, string(rep.Body()))
 	}
 	return device, nil
@@ -200,7 +199,7 @@ func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName
 		Name:   propertyName,
 		GetURL: propertyGetURL,
 	}
-	if resp, err := getPropertyState(propertyGetURL); err != nil {
+	if resp, err := efc.getPropertyState(propertyGetURL); err != nil {
 		return nil, err
 	} else {
 		var eResp edgex_resp.EventResponse
@@ -213,13 +212,8 @@ func (efc *EdgexDeviceClient) GetPropertyState(ctx context.Context, propertyName
 }
 
 // getPropertyState returns different error messages according to the status code
-func getPropertyState(getURL string) (*resty.Response, error) {
-	cookieJar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-	// TODO: no need to instantiate a client for every request
-	resp, err := resty.NewWithClient(&http.Client{
-		Jar:     cookieJar,
-		Timeout: 10 * time.Second,
-	}).R().Get(getURL)
+func (efc *EdgexDeviceClient) getPropertyState(getURL string) (*resty.Response, error) {
+	resp, err := efc.R().Get(getURL)
 	if err != nil {
 		return resp, err
 	}
@@ -256,7 +250,7 @@ func (efc *EdgexDeviceClient) UpdatePropertyState(ctx context.Context, propertyN
 	bodyMap[parameterName] = dps.DesiredValue
 	body, _ := json.Marshal(bodyMap)
 	klog.V(5).Infof("setting the property to desired value", "propertyName", parameterName, "desiredValue", string(body))
-	rep, err := resty.New().R().
+	rep, err := efc.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(body).
 		Put(dps.PutURL)
@@ -310,7 +304,7 @@ func (efc *EdgexDeviceClient) ListPropertiesState(ctx context.Context, device *d
 				aps = devicev1alpha1.ActualPropertyState{Name: c.Name, GetURL: getURL}
 			}
 			apsm[c.Name] = aps
-			resp, err := getPropertyState(getURL)
+			resp, err := efc.getPropertyState(getURL)
 			if err != nil {
 				klog.V(5).ErrorS(err, "getPropertyState failed", "propertyName", c.Name, "deviceName", actualDeviceName)
 			} else {

@@ -151,6 +151,29 @@ func toEdgeXDevice(d *devicev1alpha1.Device) dtos.Device {
 	return md
 }
 
+func toEdgeXUpdateDevice(d *devicev1alpha1.Device) dtos.UpdateDevice {
+	adminState := string(toEdgeXAdminState(d.Spec.AdminState))
+	operationState := string(toEdgeXOperatingState(d.Spec.OperatingState))
+	md := dtos.UpdateDevice{
+		Description:    &d.Spec.Description,
+		Name:           &d.Name,
+		AdminState:     &adminState,
+		OperatingState: &operationState,
+		Protocols:      toEdgeXProtocols(d.Spec.Protocols),
+		LastConnected:  &d.Status.LastConnected,
+		LastReported:   &d.Status.LastReported,
+		Labels:         d.Spec.Labels,
+		Location:       d.Spec.Location,
+		ServiceName:    &d.Spec.Service,
+		ProfileName:    &d.Spec.Profile,
+		Notify:         &d.Spec.Notify,
+	}
+	if d.Status.EdgeId != "" {
+		md.Id = &d.Status.EdgeId
+	}
+	return md
+}
+
 func toEdgeXProtocols(
 	pps map[string]devicev1alpha1.ProtocolProperties) map[string]dtos.ProtocolProperties {
 	ret := map[string]dtos.ProtocolProperties{}
@@ -376,6 +399,21 @@ func makeEdgeXDeviceProfilesRequest(dps []*devicev1alpha1.DeviceProfile) []*requ
 				},
 			},
 			Profile: toEdgeXDeviceProfile(dp),
+		})
+	}
+	return req
+}
+
+func makeEdgeXDeviceUpdateRequest(devs []*devicev1alpha1.Device) []*requests.UpdateDeviceRequest {
+	var req []*requests.UpdateDeviceRequest
+	for _, dev := range devs {
+		req = append(req, &requests.UpdateDeviceRequest{
+			BaseRequest: common.BaseRequest{
+				Versionable: common.Versionable{
+					ApiVersion: APIVersionV2,
+				},
+			},
+			Device: toEdgeXUpdateDevice(dev),
 		})
 	}
 	return req
