@@ -19,7 +19,6 @@ package edgex_foundry
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -89,8 +88,8 @@ func (eds *EdgexDeviceServiceClient) Delete(ctx context.Context, name string, op
 	if err != nil {
 		return err
 	}
-	if string(resp.Body()) != "true" {
-		return errors.New(string(resp.Body()))
+	if resp.StatusCode() != http.StatusOK {
+		return fmt.Errorf("delete edgex deviceservice err: %s", string(resp.Body()))
 	}
 	return nil
 }

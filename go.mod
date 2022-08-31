@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/edgexfoundry/go-mod-core-contracts/v2 v2.1.0
 	github.com/go-resty/resty/v2 v2.4.0
+	github.com/jarcoal/httpmock v1.2.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0
 	github.com/spf13/cobra v1.2.1
