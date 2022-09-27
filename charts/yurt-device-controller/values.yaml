@@ -1,0 +1,21 @@
+# global variables
+replicaCount: 1
+# yurt-device-controller related variables
+deviceController:
+  namespace: default
+  healthzPort: 8081
+  healthzPath: "/healthz"
+  metricsAddr: "127.0.0.1:8080"
+  readyzPath: "/readyz"
+  readyzPort: 8081
+  image: openyurt/yurt-device-controller:v0.2.0
+  imagePullPolicy: IfNotPresent
+  nodepool: nodepool
+  replicas: 1
+  resources:
+    limits:
+      cpu: 100m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi

@@ -1,0 +1,79 @@
+apiVersion: apps.openyurt.io/v1alpha1
+kind: UnitedDeployment
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: ud-device
+  namespace: {{ .Values.deviceController.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: ud-device
+  workloadTemplate:
+    deploymentTemplate:
+      metadata:
+        labels:
+          app: ud-device
+      spec:
+        template:
+          metadata:
+            labels:
+              app: ud-device
+              control-plane: controller-manager
+          spec:
+            containers:
+            - args:
+              - --health-probe-bind-address=:{{ .Values.deviceController.healthzPort }}
+              - --metrics-bind-address={{ .Values.deviceController.metricsAddr }}
+              - --leader-elect=false
+              - --v=5
+              command:
+              - /yurt-device-controller
+              image: {{ .Values.deviceController.image }}
+              imagePullPolicy: {{ .Values.deviceController.imagePullPolicy }}
+              livenessProbe:
+                httpGet:
+                  path: {{ .Values.deviceController.healthzPath }}
+                  port: {{ .Values.deviceController.healthzPort }}
+                initialDelaySeconds: 15
+                periodSeconds: 20
+              name: manager
+              readinessProbe:
+                httpGet:
+                  path: {{ .Values.deviceController.readyzPath }}
+                  port: {{ .Values.deviceController.readyzPort }}
+                initialDelaySeconds: 15
+                periodSeconds: 20
+              resources:
+{{ toYaml .Values.deviceController.resources | indent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+            securityContext:
+              runAsUser: 65532
+            terminationGracePeriodSeconds: 10
+  topology:
+    pools:
+    - name: {{ .Values.deviceController.nodepool }}
+      nodeSelectorTerm:
+        matchExpressions:
+        - key: apps.openyurt.io/nodepool
+          operator: In
+          values:
+          - {{ .Values.deviceController.nodepool }}
+      replicas: {{ .Values.deviceController.replicas }}
+      tolerations:
+      - operator: Exists
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: default-cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: ""
+---
