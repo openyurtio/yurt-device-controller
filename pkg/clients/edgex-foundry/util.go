@@ -110,7 +110,7 @@ func toEdgeXProfileProperty(pp devicev1alpha1.ResourceProperties) dtos.ResourceP
 func toKubeDeviceService(ds dtos.DeviceService) devicev1alpha1.DeviceService {
 	return devicev1alpha1.DeviceService{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      strings.ToLower(ds.Name),
+			Name:      toKubeName(ds.Name),
 			Namespace: "default",
 			Labels: map[string]string{
 				EdgeXObjectName: ds.Name,
@@ -207,7 +207,7 @@ func toKubeDevice(ed dtos.Device) devicev1alpha1.Device {
 	}
 	return devicev1alpha1.Device{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      strings.ToLower(ed.Name),
+			Name:      toKubeName(ed.Name),
 			Namespace: "default",
 			Labels: map[string]string{
 				EdgeXObjectName: ed.Name,
@@ -250,7 +250,7 @@ func toKubeProtocols(
 func toKubeDeviceProfile(dp *dtos.DeviceProfile) devicev1alpha1.DeviceProfile {
 	return devicev1alpha1.DeviceProfile{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      strings.ToLower(dp.Name),
+			Name:      toKubeName(dp.Name),
 			Namespace: "default",
 			Labels: map[string]string{
 				EdgeXObjectName: dp.Name,
@@ -447,4 +447,8 @@ func makeEdgeXDeviceService(dss []*devicev1alpha1.DeviceService) []*requests.Add
 		})
 	}
 	return req
+}
+
+func toKubeName(edgexName string) string {
+	return strings.ReplaceAll(strings.ToLower(edgexName), "_", "-")
 }
