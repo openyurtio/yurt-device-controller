@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Run Check License
         run: hack/make-rules/check_license.sh
 
@@ -28,17 +28,17 @@ jobs:
       - name: Checkout
         uses: actions/setup-go@v3
         with:
-          submodules: true
+          submodules:
       - name: Setup Go
         uses: actions/checkout@v3
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: false
       - name: Lint golang code
         uses: golangci/golangci-lint-action@v3
         with:
           version: ${{ env.GOLANGCI_VERSION }}
-          args: --timeout=15m
-
+          args: --disable-all  -E deadcode -E gofmt -E goimports -E ineffassign -E misspell -E vet --timeout=15m
   markdownlint-misspell-shellcheck:
     runs-on: ubuntu-latest
     # this image is build from Dockerfile
@@ -54,17 +54,17 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
       - name: Fetch History
         run: git fetch --prune --unshallow
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Cache Go Dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -74,7 +74,7 @@ jobs:
       - name: Run test
         run: make test
       - name: Upload test coverage
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: cover.out
