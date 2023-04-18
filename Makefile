@@ -55,6 +55,9 @@ build:
 release:
 	bash hack/make-rules/release-images.sh
 
+buildx-release:
+	docker buildx build --no-cache --push --platform linux/arm64,linux/amd64 -f hack/Dockerfile . -t ${IMG}
+
 clean:
 	-rm -Rf bin
 	-rm -Rf _output
